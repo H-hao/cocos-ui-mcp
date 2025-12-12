@@ -64,12 +64,12 @@
                         },
                         "width": {
                             "type": "number",
-                            "default": 400,
+                            "default": 600,
                             "description": " 面板默认宽度 / Panel Default Width"
                         },
                         "height": {
                             "type": "number",
-                            "default": 600,
+                            "default": 800,
                             "description": "面板默认高度 / Panel Default Height"
                         }
                     }
