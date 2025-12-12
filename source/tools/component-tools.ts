@@ -147,6 +147,57 @@ export class ComponentTools implements ToolExecutor {
                 }
             },
             {
+                name: 'set_component_properties',
+                description: 'Batch set multiple component properties in one call. Each item uses the same schema as set_component_property.',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        nodeUuid: {
+                            type: 'string',
+                            description: 'Target node UUID - Must specify the node to operate on'
+                        },
+                        componentType: {
+                            type: 'string',
+                            description: 'Component type - Can be built-in components (e.g., cc.Label) or custom script components (e.g., MyScript). If unsure about component type, use get_components first to retrieve all components on the node.'
+                        },
+                        continueOnError: {
+                            type: 'boolean',
+                            description: 'Whether to continue setting remaining properties when one item fails',
+                            default: true
+                        },
+                        properties: {
+                            type: 'array',
+                            description: 'Properties to set (each item follows the same schema as set_component_property)',
+                            minItems: 1,
+                            items: {
+                                type: 'object',
+                                properties: {
+                                    property: {
+                                        type: 'string',
+                                        description: 'Property name'
+                                    },
+                                    propertyType: {
+                                        type: 'string',
+                                        description: 'Property type - Must explicitly specify the property data type for correct value conversion and validation',
+                                        enum: [
+                                            'string', 'number', 'boolean', 'integer', 'float',
+                                            'color', 'vec2', 'vec3', 'size',
+                                            'node', 'component', 'spriteFrame', 'prefab', 'asset',
+                                            'nodeArray', 'colorArray', 'numberArray', 'stringArray'
+                                        ]
+                                    },
+                                    value: {
+                                        description: 'Property value - Same format as set_component_property.value'
+                                    }
+                                },
+                                required: ['property', 'propertyType', 'value']
+                            }
+                        }
+                    },
+                    required: ['nodeUuid', 'componentType', 'properties']
+                }
+            },
+            {
                 name: 'attach_script',
                 description: 'Attach a script component to a node',
                 inputSchema: {
@@ -194,6 +245,8 @@ export class ComponentTools implements ToolExecutor {
                 return await this.getComponentInfo(args.nodeUuid, args.componentType);
             case 'set_component_property':
                 return await this.setComponentProperty(args);
+            case 'set_component_properties':
+                return await this.setComponentProperties(args);
             case 'attach_script':
                 return await this.attachScript(args.nodeUuid, args.scriptPath);
             case 'get_available_components':
@@ -201,6 +254,101 @@ export class ComponentTools implements ToolExecutor {
             default:
                 throw new Error(`Unknown tool: ${toolName}`);
         }
+    }
+
+    private async setComponentProperties(args: any): Promise<ToolResponse> {
+        const { nodeUuid, componentType, properties, continueOnError = true } = args || {};
+
+        if (!nodeUuid || !componentType) {
+            return { success: false, error: 'nodeUuid and componentType are required' };
+        }
+
+        if (!Array.isArray(properties) || properties.length === 0) {
+            return { success: false, error: 'properties must be a non-empty array' };
+        }
+
+        const results: any[] = [];
+        let successCount = 0;
+        let failCount = 0;
+
+        const shouldContinue = continueOnError !== undefined ? Boolean(continueOnError) : true;
+
+        for (let i = 0; i < properties.length; i++) {
+            const item = properties[i];
+
+            if (!item || typeof item !== 'object') {
+                results.push({ index: i, success: false, error: 'Invalid properties item (expected object)' });
+                failCount++;
+                if (!shouldContinue) break;
+                continue;
+            }
+
+            const property = (item as any).property;
+            const propertyType = (item as any).propertyType;
+            const value = (item as any).value;
+
+            if (!property || typeof property !== 'string') {
+                results.push({ index: i, success: false, error: 'Missing or invalid property (expected string)' });
+                failCount++;
+                if (!shouldContinue) break;
+                continue;
+            }
+
+            if (!propertyType || typeof propertyType !== 'string') {
+                results.push({ index: i, property, success: false, error: 'Missing or invalid propertyType (expected string)' });
+                failCount++;
+                if (!shouldContinue) break;
+                continue;
+            }
+
+            const singleResult = await this.setComponentProperty({
+                nodeUuid,
+                componentType,
+                property,
+                propertyType,
+                value
+            });
+
+            results.push({
+                index: i,
+                property,
+                propertyType,
+                success: singleResult.success,
+                message: singleResult.message,
+                error: singleResult.error,
+                data: singleResult.data
+            });
+
+            if (singleResult.success) {
+                successCount++;
+            } else {
+                failCount++;
+                if (!shouldContinue) break;
+            }
+        }
+
+        const attemptedCount = results.length;
+        const skippedCount = properties.length - attemptedCount;
+        const success = failCount === 0 && skippedCount === 0;
+
+        const message = success
+            ? `Successfully set ${successCount} properties on component '${componentType}'`
+            : `Set ${successCount}/${properties.length} properties on component '${componentType}' (failed: ${failCount}${skippedCount > 0 ? `, skipped: ${skippedCount}` : ''})`;
+
+        return {
+            success,
+            message,
+            data: {
+                nodeUuid,
+                componentType,
+                total: properties.length,
+                attemptedCount,
+                successCount,
+                failCount,
+                skippedCount,
+                results
+            }
+        };
     }
 
     private async addComponent(nodeUuid: string, componentType: string): Promise<ToolResponse> {

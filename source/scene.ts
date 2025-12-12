@@ -431,5 +431,62 @@ export const methods: { [key: string]: (...any: any) => any } = {
         } catch (error: any) {
             return { success: false, error: error.message };
         }
+    },
+
+    /**
+     * Batch set component properties
+     */
+    setComponentProperties(nodeUuid: string, componentType: string, properties: { property: string; value: any }[]) {
+        try {
+            if (!Array.isArray(properties) || properties.length === 0) {
+                return { success: false, error: 'properties must be a non-empty array' };
+            }
+
+            const results: any[] = [];
+            let successCount = 0;
+            let failCount = 0;
+
+            for (let i = 0; i < properties.length; i++) {
+                const item = properties[i];
+                const propName = item?.property;
+
+                if (!propName || typeof propName !== 'string') {
+                    results.push({ index: i, success: false, error: 'Missing or invalid property (expected string)' });
+                    failCount++;
+                    continue;
+                }
+
+                const single = methods.setComponentProperty(nodeUuid, componentType, propName, item?.value);
+
+                results.push({
+                    index: i,
+                    property: propName,
+                    success: single?.success === true,
+                    message: single?.message,
+                    error: single?.error
+                });
+
+                if (single?.success === true) {
+                    successCount++;
+                } else {
+                    failCount++;
+                }
+            }
+
+            return {
+                success: failCount === 0,
+                message: `Set ${successCount}/${properties.length} properties on component '${componentType}'`,
+                data: {
+                    nodeUuid,
+                    componentType,
+                    total: properties.length,
+                    successCount,
+                    failCount,
+                    results
+                }
+            };
+        } catch (error: any) {
+            return { success: false, error: error.message };
+        }
     }
 };

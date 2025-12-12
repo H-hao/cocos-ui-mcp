@@ -159,6 +159,7 @@ export class ToolManager {
                 { name: 'addComponentToNode', description: '添加组件到节点' },
                 { name: 'removeComponentFromNode', description: '从节点移除组件' },
                 { name: 'setComponentProperty', description: '设置组件属性' },
+                { name: 'setComponentProperties', description: '批量设置组件属性' },
                 { name: 'getComponentInfo', description: '获取组件信息' }
             ]},
             { category: 'prefab', name: '预制体工具', tools: [

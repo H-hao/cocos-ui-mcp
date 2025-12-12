@@ -8,7 +8,7 @@ Cocos Creator MCP 服务器是一个全面的 Model Context Protocol (MCP) 服�
 
 ## 工具分类
 
-MCP 服务器提供了 **158 个工具**，按功能分为 13 个主要类别：
+MCP 服务器提供了 **159 个工具**，按功能分为 13 个主要类别：
 
 1. [场景操作工具 (Scene Tools)](#1-场景操作工具-scene-tools)
 2. [节点操作工具 (Node Tools)](#2-节点操作工具-node-tools)
@@ -397,12 +397,13 @@ MCP 服务器提供了 **158 个工具**，按功能分为 13 个主要类别：
 ```
 
 ### 3.5 component_set_component_property
-设置组件属性值
+设置单个组件属性值
 
 **参数**:
 - `nodeUuid` (string, 必需): 节点UUID
 - `componentType` (string, 必需): 组件类型
 - `property` (string, 必需): 属性名称
+- `propertyType` (string, 必需): 属性类型（如 `string`、`number`、`color`、`spriteFrame` 等）
 - `value` (any, 必需): 属性值
 
 **示例**:
@@ -413,12 +414,39 @@ MCP 服务器提供了 **158 个工具**，按功能分为 13 个主要类别：
     "nodeUuid": "node-uuid-here",
     "componentType": "cc.Sprite",
     "property": "spriteFrame",
+    "propertyType": "spriteFrame",
     "value": "sprite-frame-uuid"
   }
 }
 ```
 
-### 3.6 component_attach_script
+### 3.6 component_set_component_properties
+批量设置组件属性值（一次设置多个属性，减少多次调用开销）
+
+**参数**:
+- `nodeUuid` (string, 必需): 节点UUID
+- `componentType` (string, 必需): 组件类型
+- `properties` (array, 必需): 要设置的属性列表（每项包含 `property`、`propertyType`、`value`）
+- `continueOnError` (boolean, 可选): 遇到失败项是否继续处理后续项，默认为 true
+
+**示例**:
+```json
+{
+  "tool": "component_set_component_properties",
+  "arguments": {
+    "nodeUuid": "node-uuid-here",
+    "componentType": "cc.Label",
+    "continueOnError": true,
+    "properties": [
+      { "property": "string", "propertyType": "string", "value": "Hello MCP" },
+      { "property": "fontSize", "propertyType": "number", "value": 32 },
+      { "property": "color", "propertyType": "color", "value": { "r": 255, "g": 0, "b": 0, "a": 255 } }
+    ]
+  }
+}
+```
+
+### 3.7 component_attach_script
 向节点附加脚本组件
 
 **参数**:
@@ -436,7 +464,7 @@ MCP 服务器提供了 **158 个工具**，按功能分为 13 个主要类别：
 }
 ```
 
-### 3.7 component_get_available_components
+### 3.8 component_get_available_components
 获取可用组件类型列表
 
 **参数**:
