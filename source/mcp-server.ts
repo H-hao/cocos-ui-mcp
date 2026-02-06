@@ -170,7 +170,8 @@ export class MCPServer {
         // Set CORS headers
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Mcp-Session-Id, mcp-session-id, mcp-protocol-version');
+        res.setHeader('Access-Control-Expose-Headers', 'Mcp-Session-Id');
         res.setHeader('Content-Type', 'application/json');
         
         if (req.method === 'OPTIONS') {
@@ -203,6 +204,8 @@ export class MCPServer {
     
     private async handleMCPRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
         let body = '';
+        const sessionId = this.resolveSessionId(req);
+        res.setHeader('Mcp-Session-Id', sessionId);
         
         req.on('data', (chunk) => {
             body += chunk.toString();
@@ -224,8 +227,32 @@ export class MCPServer {
                         throw new Error(`JSON parsing failed: ${parseError.message}. Original body: ${body.substring(0, 500)}...`);
                     }
                 }
-                
-                const response = await this.handleMessage(message);
+
+                if (Array.isArray(message)) {
+                    const responses: any[] = [];
+                    for (const item of message) {
+                        const response = await this.handleMessage(item, sessionId);
+                        if (response) {
+                            responses.push(response);
+                        }
+                    }
+
+                    if (responses.length === 0) {
+                        this.sendNotificationAccepted(res);
+                        return;
+                    }
+
+                    res.writeHead(200);
+                    res.end(JSON.stringify(responses));
+                    return;
+                }
+
+                const response = await this.handleMessage(message, sessionId);
+                if (!response) {
+                    this.sendNotificationAccepted(res);
+                    return;
+                }
+
                 res.writeHead(200);
                 res.end(JSON.stringify(response));
             } catch (error: any) {
@@ -243,13 +270,48 @@ export class MCPServer {
         });
     }
 
-    private async handleMessage(message: any): Promise<any> {
+    private async handleMessage(message: any, sessionId?: string): Promise<any | null> {
         const { id, method, params } = message;
+        const isNotification = id === undefined || id === null;
+
+        if (!method || typeof method !== 'string') {
+            if (isNotification) {
+                return null;
+            }
+            return {
+                jsonrpc: '2.0',
+                id: id ?? null,
+                error: {
+                    code: -32600,
+                    message: 'Invalid Request: missing method'
+                }
+            };
+        }
 
         try {
             let result: any;
 
             switch (method) {
+                case 'notifications/initialized':
+                case 'initialized':
+                    this.touchClient(sessionId);
+                    if (isNotification) {
+                        return null;
+                    }
+                    result = {};
+                    break;
+                case 'ping':
+                    result = {};
+                    break;
+                case 'resources/list':
+                    result = { resources: [] };
+                    break;
+                case 'resources/templates/list':
+                    result = { resourceTemplates: [] };
+                    break;
+                case 'prompts/list':
+                    result = { prompts: [] };
+                    break;
                 case 'tools/list':
                     result = { tools: this.getAvailableTools() };
                     break;
@@ -260,10 +322,20 @@ export class MCPServer {
                     break;
                 case 'initialize':
                     // MCP initialization
+                    this.touchClient(sessionId);
                     result = {
                         protocolVersion: '2024-11-05',
                         capabilities: {
-                            tools: {}
+                            tools: {
+                                listChanged: false
+                            },
+                            resources: {
+                                subscribe: false,
+                                listChanged: false
+                            },
+                            prompts: {
+                                listChanged: false
+                            }
                         },
                         serverInfo: {
                             name: 'cocos-mcp-server',
@@ -272,7 +344,18 @@ export class MCPServer {
                     };
                     break;
                 default:
+                    if (method.startsWith('notifications/')) {
+                        if (isNotification) {
+                            return null;
+                        }
+                        result = {};
+                        break;
+                    }
                     throw new Error(`Unknown method: ${method}`);
+            }
+
+            if (isNotification) {
+                return null;
             }
 
             return {
@@ -281,6 +364,9 @@ export class MCPServer {
                 result
             };
         } catch (error: any) {
+            if (isNotification) {
+                return null;
+            }
             return {
                 jsonrpc: '2.0',
                 id,
@@ -290,6 +376,35 @@ export class MCPServer {
                 }
             };
         }
+    }
+
+    private sendNotificationAccepted(res: http.ServerResponse): void {
+        res.writeHead(200);
+        res.end(JSON.stringify({
+            jsonrpc: '2.0',
+            id: null,
+            result: {}
+        }));
+    }
+
+    private resolveSessionId(req: http.IncomingMessage): string {
+        const raw = req.headers['mcp-session-id'];
+        const header = Array.isArray(raw) ? raw[0] : raw;
+        if (header && header.trim()) {
+            return header.trim();
+        }
+        return uuidv4();
+    }
+
+    private touchClient(sessionId?: string): void {
+        if (!sessionId) {
+            return;
+        }
+        this.clients.set(sessionId, {
+            id: sessionId,
+            lastActivity: new Date(),
+            userAgent: this.clients.get(sessionId)?.userAgent
+        });
     }
 
     private fixCommonJsonIssues(jsonStr: string): string {
