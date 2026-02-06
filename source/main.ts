@@ -1,10 +1,89 @@
+import { join, sep } from 'path';
 import { MCPServer } from './mcp-server';
 import { readSettings, saveSettings } from './settings';
 import { MCPServerSettings } from './types';
 import { ToolManager } from './tools/tool-manager';
 
+type IncomingSettings = Partial<MCPServerSettings> & {
+    debugLog?: boolean;
+};
+
+const SERVER_MODULE_FILENAME = 'mcp-server.js';
+const TOOLS_DIRNAME = 'tools';
+
+let MCPServerCtor: typeof MCPServer = MCPServer;
 let mcpServer: MCPServer | null = null;
 let toolManager: ToolManager;
+
+function normalizeSettings(input: IncomingSettings): MCPServerSettings {
+    const baseSettings = readSettings();
+    const { debugLog, ...partialSettings } = input || {};
+    const enableDebugLog = typeof partialSettings.enableDebugLog === 'boolean'
+        ? partialSettings.enableDebugLog
+        : typeof debugLog === 'boolean'
+            ? debugLog
+            : baseSettings.enableDebugLog;
+
+    return {
+        ...baseSettings,
+        ...partialSettings,
+        enableDebugLog,
+        allowedOrigins: Array.isArray(partialSettings.allowedOrigins)
+            ? partialSettings.allowedOrigins
+            : baseSettings.allowedOrigins,
+    };
+}
+
+function getCurrentSettings(): MCPServerSettings {
+    return mcpServer ? mcpServer.getSettings() : readSettings();
+}
+
+function syncEnabledTools(server: MCPServer): void {
+    if (!toolManager) {
+        return;
+    }
+    const enabledTools = toolManager.getEnabledTools();
+    server.updateEnabledTools(enabledTools);
+}
+
+function createServerInstance(settings: MCPServerSettings): MCPServer {
+    const server = new MCPServerCtor(settings);
+    syncEnabledTools(server);
+    return server;
+}
+
+async function recreateServer(settings: MCPServerSettings, shouldStart: boolean): Promise<void> {
+    if (mcpServer) {
+        mcpServer.stop();
+    }
+    mcpServer = createServerInstance(settings);
+    if (shouldStart) {
+        await mcpServer.start();
+    }
+}
+
+function clearServerModuleCache(): void {
+    const serverModulePath = join(__dirname, SERVER_MODULE_FILENAME);
+    const toolsDirPath = join(__dirname, TOOLS_DIRNAME);
+    const normalizedToolsDirPath = `${toolsDirPath}${sep}`;
+
+    for (const modulePath of Object.keys(require.cache)) {
+        if (modulePath === serverModulePath || modulePath.startsWith(normalizedToolsDirPath)) {
+            delete require.cache[modulePath];
+        }
+    }
+}
+
+function reloadServerConstructorFromDist(): void {
+    const serverModulePath = join(__dirname, SERVER_MODULE_FILENAME);
+    clearServerModuleCache();
+
+    const loadedModule = require(serverModulePath) as { MCPServer?: typeof MCPServer };
+    if (!loadedModule || typeof loadedModule.MCPServer !== 'function') {
+        throw new Error(`无法从 ${serverModulePath} 加载 MCPServer`);
+    }
+    MCPServerCtor = loadedModule.MCPServer;
+}
 
 /**
  * @en Registration method for the main process of Extension
@@ -26,14 +105,12 @@ export const methods: { [key: string]: (...any: any) => any } = {
      * @zh 启动 MCP 服务器
      */
     async startServer() {
-        if (mcpServer) {
-            // 确保使用最新的工具配置
-            const enabledTools = toolManager.getEnabledTools();
-            mcpServer.updateEnabledTools(enabledTools);
-            await mcpServer.start();
-        } else {
-            console.warn('[MCP插件] mcpServer 未初始化');
+        if (!mcpServer) {
+            const settings = normalizeSettings(readSettings());
+            mcpServer = createServerInstance(settings);
         }
+        syncEnabledTools(mcpServer);
+        await mcpServer.start();
     },
 
     /**
@@ -54,7 +131,7 @@ export const methods: { [key: string]: (...any: any) => any } = {
      */
     getServerStatus() {
         const status = mcpServer ? mcpServer.getStatus() : { running: false, port: 0, clients: 0 };
-        const settings = mcpServer ? mcpServer.getSettings() : readSettings();
+        const settings = getCurrentSettings();
         return {
             ...status,
             settings: settings
@@ -65,15 +142,45 @@ export const methods: { [key: string]: (...any: any) => any } = {
      * @en Update server settings
      * @zh 更新服务器设置
      */
-    updateSettings(settings: MCPServerSettings) {
-        saveSettings(settings);
-        if (mcpServer) {
-            mcpServer.stop();
-            mcpServer = new MCPServer(settings);
-            mcpServer.start();
-        } else {
-            mcpServer = new MCPServer(settings);
-            mcpServer.start();
+    async updateSettings(settings: IncomingSettings) {
+        const normalizedSettings = normalizeSettings(settings);
+        const shouldKeepRunning = mcpServer ? mcpServer.getStatus().running : false;
+        saveSettings(normalizedSettings);
+        await recreateServer(normalizedSettings, shouldKeepRunning);
+        return {
+            success: true,
+            running: shouldKeepRunning,
+            settings: normalizedSettings,
+        };
+    },
+
+    /**
+     * @en Restart server with latest dist/mcp-server.js
+     * @zh 使用最新 dist/mcp-server.js 热重启服务器
+     */
+    async restartServerFromDist() {
+        const previousCtor = MCPServerCtor;
+        const previousSettings = normalizeSettings(getCurrentSettings());
+        const previousRunningState = mcpServer ? mcpServer.getStatus().running : false;
+
+        try {
+            reloadServerConstructorFromDist();
+            await recreateServer(previousSettings, true);
+            return {
+                success: true,
+                running: true,
+            };
+        } catch (error: any) {
+            console.error('[Main] Failed to restart server from dist:', error);
+            MCPServerCtor = previousCtor;
+
+            try {
+                await recreateServer(previousSettings, previousRunningState);
+            } catch (restoreError) {
+                console.error('[Main] Failed to restore previous server state:', restoreError);
+            }
+
+            throw new Error(`从 dist 热重启失败: ${error.message}`);
         }
     },
 
@@ -101,7 +208,7 @@ export const methods: { [key: string]: (...any: any) => any } = {
      * @zh 获取服务器设置
      */
     async getServerSettings() {
-        return mcpServer ? mcpServer.getSettings() : readSettings();
+        return getCurrentSettings();
     },
 
     /**
@@ -109,7 +216,7 @@ export const methods: { [key: string]: (...any: any) => any } = {
      * @zh 获取服务器设置（替代方法）
      */
     async getSettings() {
-        return mcpServer ? mcpServer.getSettings() : readSettings();
+        return getCurrentSettings();
     },
 
     // 工具管理器相关方法
@@ -227,13 +334,9 @@ export function load() {
     // 初始化工具管理器
     toolManager = new ToolManager();
     
-    // 读取设置
-    const settings = readSettings();
-    mcpServer = new MCPServer(settings);
-    
-    // 初始化MCP服务器的工具列表
-    const enabledTools = toolManager.getEnabledTools();
-    mcpServer.updateEnabledTools(enabledTools);
+    // 读取设置并创建服务实例
+    const settings = normalizeSettings(readSettings());
+    mcpServer = createServerInstance(settings);
     
     // 如果设置了自动启动，则启动服务器
     if (settings.autoStart) {

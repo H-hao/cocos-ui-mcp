@@ -67,6 +67,11 @@
                     "stopServer"
                 ]
             },
+            "restart-server-from-dist": {
+                "methods": [
+                    "restartServerFromDist"
+                ]
+            },
             "get-server-status": {
                 "methods": [
                     "getServerStatus"

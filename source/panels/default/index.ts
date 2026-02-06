@@ -2,7 +2,7 @@
 
 import { readFileSync } from 'fs-extra';
 import { join } from 'path';
-import { createApp, App, defineComponent, ref, computed, onMounted, watch, nextTick } from 'vue';
+import { createApp, App, defineComponent, ref, computed, onMounted, onUnmounted, watch } from 'vue';
 
 const panelDataMap = new WeakMap<any, App>();
 
@@ -50,7 +50,6 @@ module.exports = Editor.Panel.define({
     ready() {
         if (this.$.app) {
             const app = createApp({});
-            app.config.compilerOptions.isCustomElement = (tag) => tag.startsWith('ui-');
             
             // 创建主应用组件
             app.component('McpServerApp', defineComponent({
@@ -58,10 +57,13 @@ module.exports = Editor.Panel.define({
                     // 响应式数据
                     const activeTab = ref('server');
                     const serverRunning = ref(false);
-                    const serverStatus = ref('已停止');
+                    const serverStatus = ref('检测中');
+                    const serverStatusType = ref<'checking' | 'running' | 'stopped'>('checking');
                     const connectedClients = ref(0);
                     const httpUrl = ref('');
                     const isProcessing = ref(false);
+                    let statusPollingTimer: ReturnType<typeof setInterval> | null = null;
+                    const isSyncingSettings = ref(false);
                     
                     const settings = ref<ServerSettings>({
                         port: 3000,
@@ -77,8 +79,9 @@ module.exports = Editor.Panel.define({
                     
                     // 计算属性
                     const statusClass = computed(() => ({
-                        'status-running': serverRunning.value,
-                        'status-stopped': !serverRunning.value
+                        'status-checking': serverStatusType.value === 'checking',
+                        'status-running': serverStatusType.value === 'running',
+                        'status-stopped': serverStatusType.value === 'stopped'
                     }));
                     
                     const totalTools = computed(() => availableTools.value.length);
@@ -93,46 +96,160 @@ module.exports = Editor.Panel.define({
                     const switchTab = (tabName: string) => {
                         activeTab.value = tabName;
                         if (tabName === 'tools') {
-                            loadToolManagerState();
+                            void loadToolManagerState();
+                        }
+                    };
+
+                    const clampInteger = (value: unknown, min: number, max: number, fallback: number) => {
+                        const numericValue = Number(value);
+                        if (!Number.isFinite(numericValue)) {
+                            return fallback;
+                        }
+                        const integerValue = Math.trunc(numericValue);
+                        return Math.min(max, Math.max(min, integerValue));
+                    };
+
+                    const getNormalizedSettings = (): ServerSettings => ({
+                        port: clampInteger(settings.value.port, 1024, 65535, 3000),
+                        autoStart: Boolean(settings.value.autoStart),
+                        debugLog: Boolean(settings.value.debugLog),
+                        maxConnections: clampInteger(settings.value.maxConnections, 1, 100, 10)
+                    });
+
+                    const normalizePortInput = () => {
+                        settings.value.port = clampInteger(settings.value.port, 1024, 65535, 3000);
+                    };
+
+                    const normalizeMaxConnectionsInput = () => {
+                        settings.value.maxConnections = clampInteger(settings.value.maxConnections, 1, 100, 10);
+                    };
+
+                    const onToolCheckboxChange = (category: string, name: string, event: Event) => {
+                        const target = event.target as HTMLInputElement | null;
+                        void updateToolStatus(category, name, Boolean(target?.checked));
+                    };
+
+                    const applyServerStatus = (statusResult: any) => {
+                        const running = Boolean(statusResult?.running);
+                        serverRunning.value = running;
+                        serverStatusType.value = running ? 'running' : 'stopped';
+                        serverStatus.value = running ? '运行中' : '已停止';
+                        connectedClients.value = statusResult?.clients || 0;
+                        httpUrl.value = running ? `http://localhost:${statusResult?.port}` : '';
+                    };
+
+                    const applyServerSettings = (statusResult: any) => {
+                        if (!statusResult?.settings) {
+                            return;
+                        }
+
+                        isSyncingSettings.value = true;
+                        const normalizedSettings = {
+                            port: clampInteger(statusResult.settings.port, 1024, 65535, 3000),
+                            autoStart: Boolean(statusResult.settings.autoStart),
+                            debugLog: Boolean(statusResult.settings.enableDebugLog),
+                            maxConnections: clampInteger(statusResult.settings.maxConnections, 1, 100, 10)
+                        };
+                        settings.value = {
+                            ...normalizedSettings
+                        };
+                        settingsChanged.value = false;
+                        isSyncingSettings.value = false;
+                    };
+
+                    const refreshServerStatus = async () => {
+                        try {
+                            const result = await Editor.Message.request('cocos-mcp-server', 'get-server-status');
+                            if (result) {
+                                applyServerStatus(result);
+                            }
+                        } catch (error) {
+                            console.error('[Vue App] Failed to refresh server status:', error);
+                        }
+                    };
+
+                    const loadServerSettings = async () => {
+                        try {
+                            const result = await Editor.Message.request('cocos-mcp-server', 'get-server-status');
+                            if (result) {
+                                applyServerSettings(result);
+                                applyServerStatus(result);
+                                console.log('[Vue App] Server settings loaded from status');
+                            }
+                        } catch (error) {
+                            console.error('[Vue App] Failed to load server settings:', error);
+                            console.log('[Vue App] Using default server settings');
                         }
                     };
                     
                     const toggleServer = async () => {
+                        if (isProcessing.value) {
+                            return;
+                        }
+
+                        isProcessing.value = true;
+                        serverStatusType.value = 'checking';
+                        serverStatus.value = '检测中';
+
                         try {
                             if (serverRunning.value) {
                                 await Editor.Message.request('cocos-mcp-server', 'stop-server');
                             } else {
                                 // 启动服务器时使用当前面板设置
-                                const currentSettings = {
-                                    port: settings.value.port,
-                                    autoStart: settings.value.autoStart,
-                                    enableDebugLog: settings.value.debugLog,
-                                    maxConnections: settings.value.maxConnections
-                                };
+                                const currentSettings = getNormalizedSettings();
+                                settings.value = { ...currentSettings };
                                 await Editor.Message.request('cocos-mcp-server', 'update-settings', currentSettings);
                                 await Editor.Message.request('cocos-mcp-server', 'start-server');
                             }
                             console.log('[Vue App] Server toggled');
                         } catch (error) {
                             console.error('[Vue App] Failed to toggle server:', error);
+                        } finally {
+                            await refreshServerStatus();
+                            isProcessing.value = false;
                         }
                     };
                     
                     const saveSettings = async () => {
+                        if (isProcessing.value) {
+                            return;
+                        }
+
                         try {
                             // 创建一个简单的对象，避免克隆错误
-                            const settingsData = {
-                                port: settings.value.port,
-                                autoStart: settings.value.autoStart,
-                                debugLog: settings.value.debugLog,
-                                maxConnections: settings.value.maxConnections
-                            };
+                            const settingsData = getNormalizedSettings();
+                            settings.value = { ...settingsData };
                             
                             const result = await Editor.Message.request('cocos-mcp-server', 'update-settings', settingsData);
                             console.log('[Vue App] Save settings result:', result);
                             settingsChanged.value = false;
+                            await refreshServerStatus();
                         } catch (error) {
                             console.error('[Vue App] Failed to save settings:', error);
+                        }
+                    };
+
+                    const restartServerFromDist = async () => {
+                        if (isProcessing.value) {
+                            return;
+                        }
+
+                        isProcessing.value = true;
+                        serverStatusType.value = 'checking';
+                        serverStatus.value = '检测中';
+
+                        try {
+                            const settingsData = getNormalizedSettings();
+                            settings.value = { ...settingsData };
+                            await Editor.Message.request('cocos-mcp-server', 'update-settings', settingsData);
+                            await Editor.Message.request('cocos-mcp-server', 'restart-server-from-dist');
+                            settingsChanged.value = false;
+                            console.log('[Vue App] Server restarted from dist');
+                        } catch (error) {
+                            console.error('[Vue App] Failed to restart server from dist:', error);
+                        } finally {
+                            await refreshServerStatus();
+                            isProcessing.value = false;
                         }
                     };
                     
@@ -218,7 +335,7 @@ module.exports = Editor.Panel.define({
                         }
                     };
                     
-                                        const saveChanges = async () => {
+                    const saveChanges = async () => {
                         try {
                             // 创建普通对象，避免Vue3响应式对象克隆错误
                             const updates = availableTools.value.map(tool => ({
@@ -238,9 +355,6 @@ module.exports = Editor.Panel.define({
                             console.error('[Vue App] Failed to save tool changes:', error);
                         }
                     };
-                    
-
-                    
                     const toggleCategoryTools = async (category: string, enabled: boolean) => {
                         try {
                             // 直接更新本地状态，然后保存
@@ -278,59 +392,32 @@ module.exports = Editor.Panel.define({
                         };
                         return categoryNames[category] || category;
                     };
-                    
-
-                    
-
-                    
                     // 监听设置变化
                     watch(settings, () => {
+                        if (isSyncingSettings.value) {
+                            return;
+                        }
                         settingsChanged.value = true;
                     }, { deep: true });
-                    
-
                     
                     // 组件挂载时加载数据
                     onMounted(async () => {
                         // 加载工具管理器状态
                         await loadToolManagerState();
-                        
-                        // 从服务器状态获取设置信息
-                        try {
-                            const serverStatus = await Editor.Message.request('cocos-mcp-server', 'get-server-status');
-                            if (serverStatus && serverStatus.settings) {
-                                settings.value = {
-                                    port: serverStatus.settings.port || 3000,
-                                    autoStart: serverStatus.settings.autoStart || false,
-                                    debugLog: serverStatus.settings.enableDebugLog || false,
-                                    maxConnections: serverStatus.settings.maxConnections || 10
-                                };
-                                console.log('[Vue App] Server settings loaded from status:', serverStatus.settings);
-                            } else if (serverStatus && serverStatus.port) {
-                                // 兼容旧版本，只获取端口信息
-                                settings.value.port = serverStatus.port;
-                                console.log('[Vue App] Port loaded from server status:', serverStatus.port);
-                            }
-                        } catch (error) {
-                            console.error('[Vue App] Failed to get server status:', error);
-                            console.log('[Vue App] Using default server settings');
-                        }
-                        
+                        await loadServerSettings();
+                        await refreshServerStatus();
+
                         // 定期更新服务器状态
-                        setInterval(async () => {
-                            try {
-                                const result = await Editor.Message.request('cocos-mcp-server', 'get-server-status');
-                                if (result) {
-                                    serverRunning.value = result.running;
-                                    serverStatus.value = result.running ? '运行中' : '已停止';
-                                    connectedClients.value = result.clients || 0;
-                                    httpUrl.value = result.running ? `http://localhost:${result.port}` : '';
-                                    isProcessing.value = false;
-                                }
-                            } catch (error) {
-                                console.error('[Vue App] Failed to get server status:', error);
-                            }
+                        statusPollingTimer = setInterval(() => {
+                            void refreshServerStatus();
                         }, 2000);
+                    });
+
+                    onUnmounted(() => {
+                        if (statusPollingTimer) {
+                            clearInterval(statusPollingTimer);
+                            statusPollingTimer = null;
+                        }
                     });
                     
                     return {
@@ -355,10 +442,15 @@ module.exports = Editor.Panel.define({
                         // 方法
                         switchTab,
                         toggleServer,
+                        restartServerFromDist,
                         saveSettings,
+                        normalizePortInput,
+                        normalizeMaxConnectionsInput,
                         copyUrl,
+                        refreshServerStatus,
                         loadToolManagerState,
                         updateToolStatus,
+                        onToolCheckboxChange,
                         selectAllTools,
                         deselectAllTools,
                         saveChanges,

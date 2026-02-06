@@ -83,12 +83,71 @@ section h3 {
     font-weight: 600;
 }
 
-.status-value.running {
+.status-value.status-checking {
+    color: var(--color-focus-fill);
+}
+
+.status-value.status-running {
     color: var(--color-success-fill);
 }
 
-.status-value.stopped {
+.status-value.status-stopped {
     color: var(--color-warn-fill);
+}
+
+.prop-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.prop-row {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    align-items: center;
+    column-gap: 12px;
+}
+
+.prop-label {
+    color: var(--color-normal-text-secondary);
+    font-size: 13px;
+}
+
+.prop-content {
+    min-width: 0;
+}
+
+.number-input,
+.text-input {
+    width: 100%;
+    min-height: 30px;
+    border: 1px solid var(--color-normal-border);
+    border-radius: 4px;
+    background: var(--color-normal-fill);
+    color: var(--color-normal-text);
+    padding: 4px 8px;
+    box-sizing: border-box;
+}
+
+.number-input:focus,
+.text-input:focus {
+    outline: none;
+    border-color: var(--color-primary-fill);
+    box-shadow: 0 0 0 1px var(--color-primary-fill);
+}
+
+.number-input:disabled,
+.text-input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.checkbox-input {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    cursor: pointer;
+    accent-color: var(--color-primary-fill);
 }
 
 .server-controls {
@@ -97,7 +156,14 @@ section h3 {
     padding: 20px;
 }
 
-.server-controls ui-button {
+.server-control-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.server-control-actions .panel-btn {
     min-width: 150px;
 }
 
@@ -105,15 +171,21 @@ section h3 {
     margin-top: 10px;
 }
 
+.input-action-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.input-action-row .text-input {
+    flex: 1;
+}
+
 footer {
     margin-top: auto;
     padding-top: 20px;
     display: flex;
     justify-content: flex-end;
-}
-
-ui-prop {
-    margin-bottom: 10px;
 }
 
 /* 工具管理器样式 */
@@ -177,6 +249,8 @@ ui-prop {
     display: flex;
     gap: 10px;
     align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
 }
 
 .tools-container {
@@ -216,10 +290,23 @@ ui-prop {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
     padding: 12px 15px;
     background: linear-gradient(135deg, var(--color-primary-fill) 0%, var(--color-primary-fill-emphasis) 100%);
     color: var(--color-primary-text);
     font-weight: 600;
+}
+
+.category-header h5 {
+    margin: 0;
+    font-size: 14px;
+}
+
+.category-controls {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
 }
 
 .category-name {
@@ -237,11 +324,16 @@ ui-prop {
     padding: 10px 15px;
 }
 
+.tool-items {
+    padding: 0 10px;
+}
+
 .tool-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 8px 0;
+    gap: 10px;
+    padding: 10px 4px 10px 8px;
     border-bottom: 1px solid var(--color-normal-border);
 }
 
@@ -263,6 +355,15 @@ ui-prop {
     font-size: 11px;
     color: var(--color-normal-text-secondary);
     margin-top: 2px;
+}
+
+.tool-item-checkbox {
+    width: 16px;
+    height: 16px;
+    margin: 0 4px 0 0;
+    flex-shrink: 0;
+    cursor: pointer;
+    accent-color: var(--color-primary-fill);
 }
 
 .tool-toggle {
@@ -363,21 +464,88 @@ ui-prop {
     padding-top: 15px;
 }
 
-/* 按钮样式 */
-ui-button.small {
-    font-size: 12px;
-    padding: 4px 8px;
-    min-width: auto;
-}
-
-ui-button.secondary {
+/* 主面板按钮样式 */
+.panel-btn {
+    border: 1px solid var(--color-normal-border);
     background: var(--color-normal-fill-emphasis);
     color: var(--color-normal-text);
-    border: 1px solid var(--color-normal-border);
+    border-radius: 4px;
+    padding: 6px 14px;
+    min-height: 30px;
+    line-height: 1.2;
+    font-size: 12px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.15s ease;
 }
 
-ui-button.secondary:hover {
+.panel-btn:hover:not(:disabled) {
     background: var(--color-normal-fill);
+}
+
+.panel-btn:active:not(:disabled) {
+    transform: translateY(1px);
+}
+
+.panel-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.panel-btn--primary {
+    background: linear-gradient(135deg, var(--color-primary-fill) 0%, var(--color-primary-fill-emphasis) 100%);
+    color: var(--color-primary-text);
+    border-color: var(--color-primary-fill-emphasis);
+}
+
+.panel-btn--primary:hover:not(:disabled) {
+    filter: brightness(1.05);
+}
+
+.panel-btn--secondary {
+    background: var(--color-normal-fill-emphasis);
+}
+
+/* 工具管理按钮样式 */
+.tool-action-btn {
+    border: 1px solid var(--color-normal-border);
+    background: var(--color-normal-fill-emphasis);
+    color: var(--color-normal-text);
+    border-radius: 4px;
+    padding: 6px 12px;
+    min-height: 28px;
+    line-height: 1.2;
+    font-size: 12px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.tool-action-btn:hover:not(:disabled) {
+    background: var(--color-normal-fill);
+}
+
+.tool-action-btn:active:not(:disabled) {
+    transform: translateY(1px);
+}
+
+.tool-action-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.tool-action-btn--primary {
+    background: linear-gradient(135deg, var(--color-primary-fill) 0%, var(--color-primary-fill-emphasis) 100%);
+    color: var(--color-primary-text);
+    border-color: var(--color-primary-fill-emphasis);
+}
+
+.tool-action-btn--primary:hover:not(:disabled) {
+    filter: brightness(1.05);
+}
+
+.tool-action-btn--secondary {
+    background: var(--color-normal-fill-emphasis);
 }
 
 /* 空状态样式 */

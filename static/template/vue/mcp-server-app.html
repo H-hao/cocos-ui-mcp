@@ -14,59 +14,102 @@
         <section class="server-status">
             <h3>服务器状态</h3>
             <div class="status-info">
-                <ui-prop>
-                    <ui-label slot="label">状态</ui-label>
-                    <ui-label slot="content" class="status-value" :class="statusClass">{{ serverStatus }}</ui-label>
-                </ui-prop>
-                <ui-prop v-if="serverRunning">
-                    <ui-label slot="label">连接数</ui-label>
-                    <ui-label slot="content">{{ connectedClients }}</ui-label>
-                </ui-prop>
+                <div class="prop-list">
+                    <div class="prop-row">
+                        <label class="prop-label">状态</label>
+                        <div class="prop-content">
+                            <span class="status-value" :class="statusClass">{{ serverStatus }}</span>
+                        </div>
+                    </div>
+                    <div class="prop-row" v-if="serverRunning">
+                        <label class="prop-label">连接数</label>
+                        <div class="prop-content">
+                            <span>{{ connectedClients }}</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
 
         <section class="server-controls">
-            <ui-button @click="toggleServer" :disabled="isProcessing" class="primary">
-                {{ serverRunning ? '停止服务器' : '启动服务器' }}
-            </ui-button>
+            <div class="server-control-actions">
+                <button type="button" class="panel-btn panel-btn--primary" @click="toggleServer" :disabled="isProcessing">
+                    {{ serverRunning ? '停止服务器' : '启动服务器' }}
+                </button>
+                <button type="button" class="panel-btn panel-btn--secondary" @click="restartServerFromDist" :disabled="isProcessing">
+                    从 dist 热重启
+                </button>
+            </div>
         </section>
 
         <section class="server-settings">
             <h3>服务器设置</h3>
-            <ui-prop>
-                <ui-label slot="label">端口</ui-label>
-                <ui-num-input slot="content" v-model="settings.port" :min="1024" :max="65535" :step="1" :disabled="serverRunning">
-                </ui-num-input>
-            </ui-prop>
-            <ui-prop>
-                <ui-label slot="label">自动启动</ui-label>
-                <ui-checkbox slot="content" v-model="settings.autoStart"></ui-checkbox>
-            </ui-prop>
-            <ui-prop>
-                <ui-label slot="label">调试日志</ui-label>
-                <ui-checkbox slot="content" v-model="settings.debugLog"></ui-checkbox>
-            </ui-prop>
-            <ui-prop>
-                <ui-label slot="label">最大连接数</ui-label>
-                <ui-num-input slot="content" v-model="settings.maxConnections" :min="1" :max="100" :step="1">
-                </ui-num-input>
-            </ui-prop>
+            <div class="prop-list">
+                <div class="prop-row">
+                    <label class="prop-label" for="server-port">端口</label>
+                    <div class="prop-content">
+                        <input
+                            id="server-port"
+                            class="number-input"
+                            type="number"
+                            v-model.number="settings.port"
+                            min="1024"
+                            max="65535"
+                            step="1"
+                            :disabled="serverRunning"
+                            @blur="normalizePortInput"
+                        >
+                    </div>
+                </div>
+                <div class="prop-row">
+                    <label class="prop-label" for="server-auto-start">自动启动</label>
+                    <div class="prop-content">
+                        <input id="server-auto-start" class="checkbox-input" type="checkbox" v-model="settings.autoStart">
+                    </div>
+                </div>
+                <div class="prop-row">
+                    <label class="prop-label" for="server-debug-log">调试日志</label>
+                    <div class="prop-content">
+                        <input id="server-debug-log" class="checkbox-input" type="checkbox" v-model="settings.debugLog">
+                    </div>
+                </div>
+                <div class="prop-row">
+                    <label class="prop-label" for="server-max-connections">最大连接数</label>
+                    <div class="prop-content">
+                        <input
+                            id="server-max-connections"
+                            class="number-input"
+                            type="number"
+                            v-model.number="settings.maxConnections"
+                            min="1"
+                            max="100"
+                            step="1"
+                            @blur="normalizeMaxConnectionsInput"
+                        >
+                    </div>
+                </div>
+            </div>
         </section>
 
         <section class="server-info" v-if="serverRunning">
             <h3>连接信息</h3>
             <div class="connection-details">
-                <ui-prop>
-                    <ui-label slot="label">HTTP URL</ui-label>
-                    <ui-input slot="content" :value="httpUrl" readonly>
-                        <ui-button slot="suffix" @click="copyUrl">复制</ui-button>
-                    </ui-input>
-                </ui-prop>
+                <div class="prop-list">
+                    <div class="prop-row">
+                        <label class="prop-label" for="http-url">HTTP URL</label>
+                        <div class="prop-content">
+                            <div class="input-action-row">
+                                <input id="http-url" class="text-input" type="text" :value="httpUrl" readonly>
+                                <button type="button" class="panel-btn panel-btn--secondary" :disabled="!httpUrl" @click="copyUrl">复制</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
 
         <footer>
-            <ui-button @click="saveSettings" :disabled="!settingsChanged">保存设置</ui-button>
+            <button type="button" class="panel-btn panel-btn--primary" @click="saveSettings" :disabled="!settingsChanged || isProcessing">保存设置</button>
         </footer>
     </div>
     
@@ -87,9 +130,9 @@
                         </div>
                     </div>
                     <div class="tools-section-controls">
-                        <ui-button @click="selectAllTools" class="small">全选</ui-button>
-                        <ui-button @click="deselectAllTools" class="small">取消全选</ui-button>
-                        <ui-button @click="saveChanges" class="primary">保存更改</ui-button>
+                        <button type="button" class="tool-action-btn tool-action-btn--secondary" :disabled="isProcessing || totalTools === 0" @click="selectAllTools">全选</button>
+                        <button type="button" class="tool-action-btn tool-action-btn--secondary" :disabled="isProcessing || totalTools === 0" @click="deselectAllTools">取消全选</button>
+                        <button type="button" class="tool-action-btn tool-action-btn--primary" :disabled="isProcessing || totalTools === 0" @click="saveChanges">保存更改</button>
                     </div>
                 </div>
                 
@@ -98,16 +141,18 @@
                         <div class="category-header">
                             <h5>{{ getCategoryDisplayName(category) }}</h5>
                             <div class="category-controls">
-                                <ui-button @click="toggleCategoryTools(category, true)" class="small">全选</ui-button>
-                                <ui-button @click="toggleCategoryTools(category, false)" class="small">取消全选</ui-button>
+                                <button type="button" class="tool-action-btn tool-action-btn--secondary" :disabled="isProcessing" @click="toggleCategoryTools(category, true)">全选</button>
+                                <button type="button" class="tool-action-btn tool-action-btn--secondary" :disabled="isProcessing" @click="toggleCategoryTools(category, false)">取消全选</button>
                             </div>
                         </div>
                         <div class="tool-items">
                             <div v-for="tool in getToolsByCategory(category)" :key="tool.name" class="tool-item">
-                                <ui-checkbox 
-                                    :value="tool.enabled"
-                                    @change="(event) => updateToolStatus(category, tool.name, event.target.checked)"
-                                ></ui-checkbox>
+                                <input
+                                    class="tool-item-checkbox"
+                                    type="checkbox"
+                                    :checked="tool.enabled"
+                                    @change="(event) => onToolCheckboxChange(category, tool.name, event)"
+                                >
                                 <div class="tool-info">
                                     <div class="tool-name">{{ tool.name }}</div>
                                     <div class="tool-description">{{ tool.description }}</div>
