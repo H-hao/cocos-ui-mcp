@@ -6,18 +6,18 @@ This repository is a maintained fork of `DaxianLee/cocos-mcp-server`. This READM
 
 ## UI Preview
 
-### Main Dashboard (Server Control / Tool Management)
+### Main Dashboard
 
-![MCP Main Dashboard](docs/images/ui-mcp-panel.png)
+![MCP Main Dashboard](image/main-ui.jpg)
 
-### Extension Menu and Server Panel Example
+### MCP Tools Menu
 
-![Extension menu and server panel](docs/images/ui-open-menu-and-server.png)
+![MCP Tools Menu](image/tools-ui.jpg)
 
 ## Key Changes in This Fork
 
 - Panel frontend refactor to `Vite + Vue 3 + Tailwind CSS + Element Plus`.
-- Removed standalone `tool-manager` panel and merged tool controls into the main dashboard tabs.
+- Cleanup obsolete files to simplify project structure and reduce maintenance overhead.
 - Added `restart-server-from-dist` hot-restart flow and improved server recreation after settings updates.
 - Improved MCP compatibility with session ID handling, notification processing, and JSON fault-tolerant parsing.
 - Added/enhanced tool capability such as batch component property updates via `set_component_properties`.

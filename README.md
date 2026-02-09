@@ -6,18 +6,18 @@
 
 ## 界面预览
 
-### 主控制台（服务控制 / 工具管理）
+### 主控制台
 
-![MCP 主控制台](docs/images/ui-mcp-panel.png)
+![MCP 主控制台](image/main-ui.jpg)
 
-### 扩展菜单与服务面板示例
+### MCP 工具菜单
 
-![扩展菜单与服务面板](docs/images/ui-open-menu-and-server.png)
+![MCP 工具菜单](image/tools-ui.jpg)
 
 ## 我们的核心变更
 
 - 面板前端重构：从旧模板改为 `Vite + Vue 3 + Tailwind CSS + Element Plus`。
-- 单面板整合：移除独立 `tool-manager` 面板，将工具管理并入主控制台标签页。
+- 无用文件清理：移除冗余/废弃文件，收敛项目结构并降低维护成本。
 - 服务器控制增强：新增 `restart-server-from-dist` 热重启能力，完善设置更新后的服务重建流程。
 - MCP 兼容性增强：补充会话 ID 管理、notification 请求处理、JSON 容错解析。
 - 工具能力补强：新增/完善 `set_component_properties` 等批量组件属性操作。
