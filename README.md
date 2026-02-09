@@ -295,6 +295,12 @@ npm install
 npm run build
 ```
 
+面板前端可以单独构建：
+
+```bash
+npm run build:panel
+```
+
 ### 4. 启用插件
 
 1. 重启 Cocos Creator 或刷新扩展
@@ -347,9 +353,17 @@ cocos-mcp-server/
 │   │   └── asset-advanced-tools.ts
 │   ├── panels/               # UI 面板实现
 │   └── test/                 # 测试文件
+├── panel-ui/                  # Vue SFC 前端工程（Vite + Tailwind + Element Plus）
+│   ├── src/
+│   └── tsconfig.json
 ├── dist/                     # 编译后的 JavaScript 输出
+│   ├── panel-ui/             # 前端产物（index.cjs / style.css）
+│   └── ...
 ├── static/                   # 静态资源（图标等）
 ├── i18n/                     # 国际化文件
+├── vite.panel.config.ts      # 面板构建配置
+├── tailwind.config.ts        # Tailwind 配置
+├── postcss.config.cjs        # PostCSS 配置
 ├── package.json              # 插件配置
 └── tsconfig.json             # TypeScript 配置
 ```
@@ -359,6 +373,12 @@ cocos-mcp-server/
 ```bash
 # 安装依赖
 npm install
+
+# 仅构建面板前端
+npm run build:panel
+
+# 仅监视面板前端
+npm run watch:panel
 
 # 开发构建（监视模式）
 npm run watch
@@ -423,5 +443,3 @@ npm run build
 
 ## 联系我加入群
 <img alt="image" src="https://github.com/user-attachments/assets/a276682c-4586-480c-90e5-6db132e89e0f" width="400" height="400" />
-
-
