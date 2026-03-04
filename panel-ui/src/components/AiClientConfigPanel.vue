@@ -47,10 +47,22 @@ onMounted(() => {
     void refreshStatus();
 });
 
-const clientOptions = computed(() => clients.value.map((item) => ({
-    label: item.clientName,
-    value: item.clientType,
-})));
+const CLIENT_TYPE_ORDER: AiClientType[] = ['cursor', 'windsurf', 'trae', 'codex-cli', 'claude-cli', 'gemini-cli'];
+
+const clientOptions = computed(() => {
+    const clientNameMap = new Map(clients.value.map((item) => [item.clientType, item.clientName]));
+    return CLIENT_TYPE_ORDER.map((clientType) => ({
+        value: clientType,
+        label: clientNameMap.get(clientType) || clientType,
+    }));
+});
+
+watch(clientOptions, (options) => {
+    const hasSelected = options.some((item) => item.value === selectedClient.value);
+    if (!hasSelected) {
+        selectedClient.value = 'cursor';
+    }
+}, { immediate: true });
 
 const batchResultEntries = computed(() => Object.entries(batchResults.value || {}));
 
@@ -72,7 +84,7 @@ function isClientOperating(clientType: AiClientType) {
 </script>
 
 <template>
-    <div class="ai-config-pane">
+    <div class="ai-config-pane pt-4">
         <el-card class="console-card" shadow="never">
             <div class="ai-config-header">
                 <div class="ai-config-title">
@@ -95,7 +107,7 @@ function isClientOperating(clientType: AiClientType) {
                         <el-input :model-value="serverUrl" readonly />
                     </el-form-item>
                     <el-form-item label="CLI scope">
-                        <el-select v-model="scope" class="w-full">
+                        <el-select v-model="scope" class="w-full" :teleported="false">
                             <el-option label="user" value="user" />
                             <el-option label="project" value="project" />
                         </el-select>
@@ -171,7 +183,7 @@ function isClientOperating(clientType: AiClientType) {
                 <div class="output-header">
                     <h4>客户端配置片段</h4>
                     <div class="output-actions">
-                        <el-select v-model="selectedClient" class="w-[160px]" size="small">
+                        <el-select v-model="selectedClient" class="!w-[160px]" size="small" :teleported="false">
                             <el-option v-for="item in clientOptions" :key="item.value" :label="item.label" :value="item.value" />
                         </el-select>
                         <el-button size="small" :loading="loadingGenerate"
@@ -200,6 +212,17 @@ function isClientOperating(clientType: AiClientType) {
 .ai-config-pane {
     display: grid;
     gap: 14px;
+    position: relative;
+    z-index: 0;
+}
+
+/* Keep table stack below sticky tabs/header to avoid overlap while scrolling */
+:deep(.el-table),
+:deep(.el-table__inner-wrapper),
+:deep(.el-table__header-wrapper),
+:deep(.el-table__body-wrapper) {
+    position: relative;
+    z-index: 0;
 }
 
 .ai-config-header {

@@ -18,6 +18,8 @@ import {
     CLICommandConfig
 } from './mcp-client-configs';
 
+type PanelScope = 'user' | 'project';
+
 export interface ConfigOperationResult {
     success: boolean;
     message: string;
@@ -32,9 +34,9 @@ export class MCPConfigManager {
     /**
      * 检查配置文件是否存在
      */
-    public static configFileExists(clientType: ClientType): boolean {
+    public static configFileExists(clientType: ClientType, scope: PanelScope = 'user'): boolean {
         try {
-            const configPath = getConfigFilePath(clientType);
+            const configPath = getConfigFilePath(clientType, { scope });
             return fs.existsSync(configPath);
         } catch (error) {
             return false;
@@ -44,9 +46,9 @@ export class MCPConfigManager {
     /**
      * 读取现有配置文件
      */
-    public static readConfig(clientType: ClientType): any {
+    public static readConfig(clientType: ClientType, scope: PanelScope = 'user'): any {
         const client = MCP_CLIENTS[clientType];
-        const configPath = getConfigFilePath(clientType);
+        const configPath = getConfigFilePath(clientType, { scope });
 
         if (!fs.existsSync(configPath)) {
             // 配置文件不存在，返回空配置
@@ -74,8 +76,8 @@ export class MCPConfigManager {
     /**
      * 备份现有配置文件
      */
-    public static backupConfig(clientType: ClientType): string | null {
-        const configPath = getConfigFilePath(clientType);
+    public static backupConfig(clientType: ClientType, scope: PanelScope = 'user'): string | null {
+        const configPath = getConfigFilePath(clientType, { scope });
 
         if (!fs.existsSync(configPath)) {
             return null;
@@ -107,9 +109,9 @@ export class MCPConfigManager {
     /**
      * 写入配置文件
      */
-    private static writeConfig(clientType: ClientType, config: any): void {
+    private static writeConfig(clientType: ClientType, config: any, scope: PanelScope = 'user'): void {
         const client = MCP_CLIENTS[clientType];
-        const configPath = getConfigFilePath(clientType);
+        const configPath = getConfigFilePath(clientType, { scope });
 
         // 确保目录存在
         this.ensureConfigDir(configPath);
@@ -135,17 +137,18 @@ export class MCPConfigManager {
      */
     public static addServer(
         clientType: ClientType,
-        serverConfig: MCPServerConfig
+        serverConfig: MCPServerConfig,
+        scope: PanelScope = 'user'
     ): ConfigOperationResult {
         try {
             const client = MCP_CLIENTS[clientType];
             console.log(`[MCPConfigManager] Adding server ${serverConfig.serverName} to ${clientType}`);
 
             // 备份现有配置
-            const backupPath = this.backupConfig(clientType);
+            const backupPath = this.backupConfig(clientType, scope);
 
             // 读取现有配置
-            const config = this.readConfig(clientType);
+            const config = this.readConfig(clientType, scope);
 
             // 获取服务器配置对象
             const serversKey = client.configFormat === 'json' ? 'mcpServers' : 'mcp_servers';
@@ -158,7 +161,7 @@ export class MCPConfigManager {
                 return {
                     success: false,
                     message: `服务器 "${serverConfig.serverName}" 已存在于配置文件中`,
-                    configPath: getConfigFilePath(clientType)
+                    configPath: getConfigFilePath(clientType, { scope })
                 };
             }
 
@@ -185,12 +188,12 @@ export class MCPConfigManager {
             config[serversKey][serverConfig.serverName] = serverEntry;
 
             // 写入配置文件
-            this.writeConfig(clientType, config);
+            this.writeConfig(clientType, config, scope);
 
             return {
                 success: true,
                 message: `成功添加服务器 "${serverConfig.serverName}" 到 ${client.name}`,
-                configPath: getConfigFilePath(clientType),
+                configPath: getConfigFilePath(clientType, { scope }),
                 backupPath: backupPath || undefined
             };
         } catch (error) {
@@ -207,13 +210,14 @@ export class MCPConfigManager {
      */
     public static removeServer(
         clientType: ClientType,
-        serverName: string
+        serverName: string,
+        scope: PanelScope = 'user'
     ): ConfigOperationResult {
         try {
             const client = MCP_CLIENTS[clientType];
             console.log(`[MCPConfigManager] Removing server ${serverName} from ${clientType}`);
 
-            const configPath = getConfigFilePath(clientType);
+            const configPath = getConfigFilePath(clientType, { scope });
             if (!fs.existsSync(configPath)) {
                 return {
                     success: false,
@@ -223,10 +227,10 @@ export class MCPConfigManager {
             }
 
             // 备份现有配置
-            const backupPath = this.backupConfig(clientType);
+            const backupPath = this.backupConfig(clientType, scope);
 
             // 读取现有配置
-            const config = this.readConfig(clientType);
+            const config = this.readConfig(clientType, scope);
 
             // 获取服务器配置对象
             const serversKey = client.configFormat === 'json' ? 'mcpServers' : 'mcp_servers';
@@ -242,7 +246,7 @@ export class MCPConfigManager {
             delete config[serversKey][serverName];
 
             // 写入配置文件
-            this.writeConfig(clientType, config);
+            this.writeConfig(clientType, config, scope);
 
             return {
                 success: true,
@@ -262,10 +266,10 @@ export class MCPConfigManager {
     /**
      * 检查服务器是否存在
      */
-    public static serverExists(clientType: ClientType, serverName: string): boolean {
+    public static serverExists(clientType: ClientType, serverName: string, scope: PanelScope = 'user'): boolean {
         try {
             const client = MCP_CLIENTS[clientType];
-            const config = this.readConfig(clientType);
+            const config = this.readConfig(clientType, scope);
             const serversKey = client.configFormat === 'json' ? 'mcpServers' : 'mcp_servers';
             return config[serversKey] && config[serversKey][serverName] !== undefined;
         } catch (error) {
@@ -276,10 +280,10 @@ export class MCPConfigManager {
     /**
      * 获取配置文件中的所有服务器名称
      */
-    public static listServers(clientType: ClientType): string[] {
+    public static listServers(clientType: ClientType, scope: PanelScope = 'user'): string[] {
         try {
             const client = MCP_CLIENTS[clientType];
-            const config = this.readConfig(clientType);
+            const config = this.readConfig(clientType, scope);
             const serversKey = client.configFormat === 'json' ? 'mcpServers' : 'mcp_servers';
 
             if (!config[serversKey]) {
@@ -306,14 +310,14 @@ export class MCPConfigManager {
     /**
      * 一键添加到所有支持的客户端
      */
-    public static addToAllClients(serverConfig: MCPServerConfig): Map<ClientType, ConfigOperationResult> {
+    public static addToAllClients(serverConfig: MCPServerConfig, scope: PanelScope = 'user'): Map<ClientType, ConfigOperationResult> {
         const results = new Map<ClientType, ConfigOperationResult>();
 
         // 添加到IDE编辑器和Codex CLI（Codex CLI支持自动配置）
         const autoConfigClients: ClientType[] = ['cursor', 'windsurf', 'trae', 'codex-cli'];
 
         for (const clientType of autoConfigClients) {
-            const result = this.addServer(clientType, serverConfig);
+            const result = this.addServer(clientType, serverConfig, scope);
             results.set(clientType, result);
         }
 
@@ -323,14 +327,14 @@ export class MCPConfigManager {
     /**
      * 从所有客户端删除
      */
-    public static removeFromAllClients(serverName: string): Map<ClientType, ConfigOperationResult> {
+    public static removeFromAllClients(serverName: string, scope: PanelScope = 'user'): Map<ClientType, ConfigOperationResult> {
         const results = new Map<ClientType, ConfigOperationResult>();
 
         const autoConfigClients: ClientType[] = ['cursor', 'windsurf', 'trae', 'codex-cli'];
 
         for (const clientType of autoConfigClients) {
-            if (this.serverExists(clientType, serverName)) {
-                const result = this.removeServer(clientType, serverName);
+            if (this.serverExists(clientType, serverName, scope)) {
+                const result = this.removeServer(clientType, serverName, scope);
                 results.set(clientType, result);
             }
         }
@@ -379,7 +383,7 @@ export class MCPConfigManager {
     /**
      * 获取配置状态摘要
      */
-    public static getConfigStatus(serverName: string): {
+    public static getConfigStatus(serverName: string, scope: PanelScope = 'user'): {
         clientType: ClientType;
         clientName: string;
         exists: boolean;
@@ -397,8 +401,8 @@ export class MCPConfigManager {
                 const isAutoConfig = clientType === 'cursor' || clientType === 'windsurf' ||
                                      clientType === 'trae' || clientType === 'codex-cli';
 
-                const configPath = getConfigFilePath(clientType);
-                const exists = this.serverExists(clientType, serverName);
+                const configPath = getConfigFilePath(clientType, { scope });
+                const exists = this.serverExists(clientType, serverName, scope);
 
                 return {
                     clientType,

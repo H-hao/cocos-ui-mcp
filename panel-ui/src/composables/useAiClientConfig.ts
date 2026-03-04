@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import {
     addToAllClients,
     addToClient,
@@ -106,7 +106,7 @@ export function useAiClientConfig() {
     async function refreshStatus() {
         loadingStatus.value = true;
         try {
-            const result = await getConfigStatus(payload.value.serverName);
+            const result = await getConfigStatus(payload.value.serverName, payload.value.scope || 'user');
             if (!result.success) {
                 throw new Error(result.message || '获取配置状态失败');
             }
@@ -171,7 +171,7 @@ export function useAiClientConfig() {
     async function removeSingle(clientType: AiClientType) {
         operatingClient.value = clientType;
         try {
-            const result = await removeFromClient(clientType, payload.value.serverName);
+            const result = await removeFromClient(clientType, payload.value.serverName, payload.value.scope || 'user');
             if (!result.success) {
                 throw new Error(result.message);
             }
@@ -204,7 +204,7 @@ export function useAiClientConfig() {
     async function removeAll() {
         loadingBatch.value = true;
         try {
-            const result = await removeFromAllClients(payload.value.serverName);
+            const result = await removeFromAllClients(payload.value.serverName, payload.value.scope || 'user');
             if (!result.success) {
                 throw new Error(result.message || '批量移除失败');
             }
@@ -233,6 +233,10 @@ export function useAiClientConfig() {
             notifyError(`打开配置文件失败：${toErrorMessage(error)}`);
         }
     }
+
+    watch(scope, () => {
+        void refreshStatus();
+    });
 
     return {
         serverName,

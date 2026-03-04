@@ -3,9 +3,17 @@
  * 支持主流AI编辑器和CLI工具的一键配置
  */
 
+import * as path from 'path';
+
 export type TransportType = 'streamable-http'; // 当前项目只支持streamable-http
 export type ClientType = 'cursor' | 'windsurf' | 'trae' | 'codex-cli' | 'claude-cli' | 'gemini-cli';
 export type ConfigScope = 'global' | 'project' | 'user' | 'local';
+export type PanelScope = 'user' | 'project';
+
+export interface ConfigFilePathOptions {
+    scope?: PanelScope;
+    projectRoot?: string;
+}
 
 /**
  * MCP客户端配置信息
@@ -312,25 +320,65 @@ function generateGeminiCLICommand(
 /**
  * 获取当前操作系统的配置文件路径
  */
-export function getConfigFilePath(clientType: ClientType): string {
+function resolveProjectRoot(projectRoot?: string): string {
+    if (projectRoot && projectRoot.trim()) {
+        return projectRoot.trim();
+    }
+
+    const editorProjectPath = (globalThis as any)?.Editor?.Project?.path;
+    if (typeof editorProjectPath === 'string' && editorProjectPath) {
+        return editorProjectPath;
+    }
+
+    return process.cwd();
+}
+
+function getProjectScopedPath(clientType: ClientType, projectRoot: string): string | null {
+    switch (clientType) {
+        case 'cursor':
+            return path.join(projectRoot, '.cursor', 'mcp.json');
+        case 'windsurf':
+            return path.join(projectRoot, '.windsurf', 'mcp_config.json');
+        case 'trae':
+            return path.join(projectRoot, '.trae', 'mcp.json');
+        case 'codex-cli':
+            return path.join(projectRoot, '.codex', 'config.toml');
+        case 'claude-cli':
+            return path.join(projectRoot, '.mcp.json');
+        case 'gemini-cli':
+            return path.join(projectRoot, '.gemini', 'settings.json');
+        default:
+            return null;
+    }
+}
+
+export function getConfigFilePath(clientType: ClientType, options: ConfigFilePathOptions = {}): string {
+    if (options.scope === 'project') {
+        const projectRoot = resolveProjectRoot(options.projectRoot);
+        const projectPath = getProjectScopedPath(clientType, projectRoot);
+        if (projectPath) {
+            return projectPath;
+        }
+    }
+
     const client = MCP_CLIENTS[clientType];
     const platform = process.platform;
 
-    let path: string | undefined;
+    let configPath: string | undefined;
     if (platform === 'darwin') {
-        path = client.configFileLocation.macOS;
+        configPath = client.configFileLocation.macOS;
     } else if (platform === 'win32') {
-        path = client.configFileLocation.windows;
+        configPath = client.configFileLocation.windows;
     } else {
-        path = client.configFileLocation.linux;
+        configPath = client.configFileLocation.linux;
     }
 
-    if (!path) {
+    if (!configPath) {
         throw new Error(`Platform ${platform} is not supported for client ${clientType}`);
     }
 
     // 展开环境变量
-    return expandPath(path);
+    return expandPath(configPath);
 }
 
 /**

@@ -339,11 +339,11 @@ export const methods: { [key: string]: (...any: any) => any } = {
      * @en Get configuration status for all AI clients
      * @zh 获取所有 AI 客户端配置状态
      */
-    async getConfigStatus(serverName: string) {
+    async getConfigStatus(serverName: string, scope: 'user' | 'project' = 'user') {
         try {
             return {
                 success: true,
-                clients: MCPConfigManager.getConfigStatus(serverName),
+                clients: MCPConfigManager.getConfigStatus(serverName, scope),
             };
         } catch (error: any) {
             return {
@@ -396,25 +396,25 @@ export const methods: { [key: string]: (...any: any) => any } = {
      * @en Add MCP server to one client config
      * @zh 添加 MCP 服务到指定客户端配置
      */
-    async addToClient(clientType: ClientType, serverConfig: MCPServerConfig) {
-        return MCPConfigManager.addServer(clientType, serverConfig);
+    async addToClient(clientType: ClientType, serverConfig: MCPServerConfig & { scope?: 'user' | 'project' }) {
+        return MCPConfigManager.addServer(clientType, serverConfig, serverConfig.scope || 'user');
     },
 
     /**
      * @en Remove MCP server from one client config
      * @zh 从指定客户端移除 MCP 服务
      */
-    async removeFromClient(clientType: ClientType, serverName: string) {
-        return MCPConfigManager.removeServer(clientType, serverName);
+    async removeFromClient(clientType: ClientType, serverName: string, scope: 'user' | 'project' = 'user') {
+        return MCPConfigManager.removeServer(clientType, serverName, scope);
     },
 
     /**
      * @en Add MCP server to all auto-config clients
      * @zh 添加 MCP 服务到全部可自动配置客户端
      */
-    async addToAllClients(serverConfig: MCPServerConfig) {
+    async addToAllClients(serverConfig: MCPServerConfig & { scope?: 'user' | 'project' }) {
         try {
-            const results = MCPConfigManager.addToAllClients(serverConfig);
+            const results = MCPConfigManager.addToAllClients(serverConfig, serverConfig.scope || 'user');
             const formattedResults: Record<string, string> = {};
             for (const [clientType, result] of results.entries()) {
                 formattedResults[MCP_CLIENTS[clientType].name] = result.message;
@@ -436,9 +436,9 @@ export const methods: { [key: string]: (...any: any) => any } = {
      * @en Remove MCP server from all auto-config clients
      * @zh 从全部可自动配置客户端移除 MCP 服务
      */
-    async removeFromAllClients(serverName: string) {
+    async removeFromAllClients(serverName: string, scope: 'user' | 'project' = 'user') {
         try {
-            const results = MCPConfigManager.removeFromAllClients(serverName);
+            const results = MCPConfigManager.removeFromAllClients(serverName, scope);
             const formattedResults: Record<string, string> = {};
             for (const [clientType, result] of results.entries()) {
                 formattedResults[MCP_CLIENTS[clientType].name] = result.message;

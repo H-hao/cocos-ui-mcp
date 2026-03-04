@@ -2,6 +2,9 @@
     min-height: 100%;
     --mcp-panel-padding: 16px;
     --header-height: 80px;
+    --z-sticky-header: 40;
+    --z-sticky-tabs: 30;
+    --z-sticky-tools: 20;
     padding: 0 var(--mcp-panel-padding) var(--mcp-panel-padding);
     font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
     color: var(--el-text-color-primary);
@@ -20,7 +23,7 @@
     position: sticky;
     padding-block-start: var(--mcp-panel-padding);
     top: 0;
-    z-index: 1;
+    z-index: var(--z-sticky-header);
     background: #edf2f9;
     height: 80px;
 }
@@ -48,7 +51,7 @@
     border-bottom: 1px solid var(--el-border-color-extra-light);
     position: sticky;
     top: var(--header-height);
-    z-index: 1;
+    z-index: var(--z-sticky-tabs);
     background: #edf2f9;
 }
 
@@ -70,7 +73,7 @@
 .tools-overview-container {
     position: sticky;
     top: calc(var(--header-height) + 40px);
-    z-index: 1;
+    z-index: var(--z-sticky-tools);
     padding-block: 12px;
     background: #edf2f9;
 }
