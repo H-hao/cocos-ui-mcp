@@ -410,7 +410,7 @@ export class MCPServer {
                             }
                         },
                         serverInfo: {
-                            name: 'cocos-mcp-server',
+                            name: 'ben-cocos-mcp',
                             version: '1.0.0'
                         }
                     };

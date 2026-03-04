@@ -97,7 +97,7 @@ export const methods: { [key: string]: (...any: any) => any } = {
      * @zh 打开 MCP 服务器面板
      */
     openPanel() {
-        Editor.Panel.open('cocos-mcp-server');
+        Editor.Panel.open('ben-cocos-mcp');
     },
 
     /**
@@ -106,7 +106,7 @@ export const methods: { [key: string]: (...any: any) => any } = {
      */
     openToolManager() {
         // 当前项目仅保留主面板，工具管理在主面板 Tab 内。
-        Editor.Panel.open('cocos-mcp-server');
+        Editor.Panel.open('ben-cocos-mcp');
         return { success: true };
     },
 

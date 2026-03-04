@@ -17,11 +17,11 @@ const DEFAULT_TOOL_MANAGER_SETTINGS: ToolManagerSettings = {
 };
 
 function getSettingsPath(): string {
-    return path.join(Editor.Project.path, 'settings', 'mcp-server.json');
+    return path.join(Editor.Project.path, 'settings', 'ben-cocos-mcp-server.json');
 }
 
 function getToolManagerSettingsPath(): string {
-    return path.join(Editor.Project.path, 'settings', 'tool-manager.json');
+    return path.join(Editor.Project.path, 'settings', 'ben-cocos-mcp-tool-manager.json');
 }
 
 function ensureSettingsDir(): void {

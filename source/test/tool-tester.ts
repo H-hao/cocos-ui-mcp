@@ -56,7 +56,7 @@ export class ToolTester {
         
         // Test execute scene script
         await this.runTest('scene', 'execute-scene-script', {
-            name: 'cocos-mcp-server',
+            name: 'ben-cocos-mcp',
             method: 'test-method',
             args: []
         });

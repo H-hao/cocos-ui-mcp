@@ -198,7 +198,7 @@ export class SceneTools implements ToolExecutor {
             }).catch((err: Error) => {
                 // 备用方案：使用场景脚本
                 const options = {
-                    name: 'cocos-mcp-server',
+                    name: 'ben-cocos-mcp',
                     method: 'getCurrentSceneInfo',
                     args: []
                 };
@@ -467,7 +467,7 @@ export class SceneTools implements ToolExecutor {
             }).catch((err: Error) => {
                 // 备用方案：使用场景脚本
                 const options = {
-                    name: 'cocos-mcp-server',
+                    name: 'ben-cocos-mcp',
                     method: 'getSceneHierarchy',
                     args: [includeComponents]
                 };

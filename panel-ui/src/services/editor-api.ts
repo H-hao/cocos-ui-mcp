@@ -13,7 +13,7 @@ import type {
     AiClientType,
 } from '../types/contracts';
 
-const EXTENSION_NAME = 'cocos-mcp-server';
+const EXTENSION_NAME = 'ben-cocos-mcp';
 
 type EditorBridge = {
     Message: {

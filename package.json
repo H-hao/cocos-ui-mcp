@@ -1,7 +1,7 @@
 {
     "$schema": "./@types/schema/package/index.json",
     "package_version": 2,
-    "name": "cocos-mcp-server",
+    "name": "ben-cocos-mcp",
     "version": "1.5.4",
     "author": "LiDaxian",
     "editor": ">=3.8.6",
@@ -14,7 +14,7 @@
         "watch:ts": "tsc -w",
         "watch": "npm-run-all --parallel watch:panel watch:ts"
     },
-    "description": "i18n:cocos-mcp-server.description",
+    "description": "i18n:ben-cocos-mcp.description",
     "main": "./dist/main.js",
     "dependencies": {
         "@iarna/toml": "^2.2.5",
@@ -40,7 +40,7 @@
     },
     "panels": {
         "default": {
-            "title": "i18n:cocos-mcp-server.panel_title",
+            "title": "i18n:ben-cocos-mcp.panel_title",
             "type": "dockable",
             "main": "dist/panels/default",
             "icon": "./static/icon.png",
@@ -55,8 +55,8 @@
     "contributions": {
         "menu": [
             {
-                "path": "i18n:menu.extension/Cocos MCP Server",
-                "label": "i18n:cocos-mcp-server.open_panel",
+                "path": "i18n:menu.extension/Cocos MCP Server (Ben)",
+                "label": "i18n:ben-cocos-mcp.open_panel",
                 "message": "open-panel"
             }
         ],

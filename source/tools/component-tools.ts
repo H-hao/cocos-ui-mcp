@@ -386,7 +386,7 @@ export class ComponentTools implements ToolExecutor {
             }).catch((err: Error) => {
                 // 备用方案：使用场景脚本
                 const options = {
-                    name: 'cocos-mcp-server',
+                    name: 'ben-cocos-mcp',
                     method: 'addComponentToNode',
                     args: [nodeUuid, componentType]
                 };
@@ -518,7 +518,7 @@ export class ComponentTools implements ToolExecutor {
             }).catch((err: Error) => {
                 // 备用方案：使用场景脚本
                 const options = {
-                    name: 'cocos-mcp-server',
+                    name: 'ben-cocos-mcp',
                     method: 'getNodeInfo',
                     args: [nodeUuid]
                 };
@@ -568,7 +568,7 @@ export class ComponentTools implements ToolExecutor {
             }).catch((err: Error) => {
                 // 备用方案：使用场景脚本
                 const options = {
-                    name: 'cocos-mcp-server',
+                    name: 'ben-cocos-mcp',
                     method: 'getNodeInfo',
                     args: [nodeUuid]
                 };

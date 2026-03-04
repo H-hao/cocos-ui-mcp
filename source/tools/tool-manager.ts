@@ -20,7 +20,7 @@ export class ToolManager {
     }
 
     private getToolManagerSettingsPath(): string {
-        return path.join(Editor.Project.path, 'settings', 'tool-manager.json');
+        return path.join(Editor.Project.path, 'settings', 'ben-cocos-mcp-tool-manager.json');
     }
 
     private ensureSettingsDir(): void {

@@ -2045,7 +2045,7 @@ export class NodeTools implements ToolExecutor {
                 // Fallback: try using scene script execution
                 try {
                     const sceneScriptOptions = {
-                        name: 'cocos-mcp-server',
+                        name: 'ben-cocos-mcp',
                         method: 'attachScript',
                         args: [nodeUuid, scriptPath]
                     };
