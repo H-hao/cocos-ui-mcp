@@ -21,6 +21,7 @@ export class MCPServer {
     private settings: MCPServerSettings;
     private httpServer: http.Server | null = null;
     private clients: Map<string, MCPClient> = new Map();
+    private sseConnections: Map<string, http.ServerResponse> = new Map();
     private tools: Record<string, any> = {};
     private toolsList: ToolDefinition[] = [];
     private enabledTools: any[] = []; // 存储启用的工具列表
@@ -181,7 +182,15 @@ export class MCPServer {
         }
         
         try {
-            if (pathname === '/mcp' && req.method === 'POST') {
+            if (pathname === '/mcp' && req.method === 'GET') {
+                await this.handleMCPSSEConnection(req, res);
+            } else if (pathname === '/mcp' && req.method === 'DELETE') {
+                await this.handleMCPSessionDelete(req, res);
+            } else if (pathname === '/sse' && req.method === 'GET') {
+                await this.handleSSEConnection(req, res);
+            } else if (pathname === '/message' && req.method === 'POST') {
+                await this.handleSSEMessage(req, res);
+            } else if (pathname === '/mcp' && req.method === 'POST') {
                 await this.handleMCPRequest(req, res);
             } else if (pathname === '/health' && req.method === 'GET') {
                 res.writeHead(200);
@@ -205,20 +214,27 @@ export class MCPServer {
     private async handleMCPRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
         let body = '';
         const sessionId = this.resolveSessionId(req);
+        // Session ID is always returned; for SSE responses it goes in writeHead headers
         res.setHeader('Mcp-Session-Id', sessionId);
-        
+
+        // Streamable HTTP (2025-03-26): clients send Accept: application/json, text/event-stream
+        // If the client wants SSE, keep the POST response open as a persistent server-push channel.
+        // This is required by rmcp and other Streamable HTTP clients — returning application/json
+        // closes the connection and the client's transport channel immediately, causing
+        // "Transport channel closed, when send initialized notification" errors.
+        const acceptHeader = ((req.headers['accept'] || '') as string).toLowerCase();
+        const wantsSSE = acceptHeader.includes('text/event-stream');
+
         req.on('data', (chunk) => {
             body += chunk.toString();
         });
-        
+
         req.on('end', async () => {
             try {
-                // Enhanced JSON parsing with better error handling
                 let message;
                 try {
                     message = JSON.parse(body);
                 } catch (parseError: any) {
-                    // Try to fix common JSON issues
                     const fixedBody = this.fixCommonJsonIssues(body);
                     try {
                         message = JSON.parse(fixedBody);
@@ -232,9 +248,7 @@ export class MCPServer {
                     const responses: any[] = [];
                     for (const item of message) {
                         const response = await this.handleMessage(item, sessionId);
-                        if (response) {
-                            responses.push(response);
-                        }
+                        if (response) responses.push(response);
                     }
 
                     if (responses.length === 0) {
@@ -242,32 +256,87 @@ export class MCPServer {
                         return;
                     }
 
-                    res.writeHead(200);
-                    res.end(JSON.stringify(responses));
+                    if (wantsSSE) {
+                        this.sendSSEResponse(req, res, sessionId, responses);
+                    } else {
+                        res.writeHead(200);
+                        res.end(JSON.stringify(responses));
+                    }
                     return;
                 }
 
                 const response = await this.handleMessage(message, sessionId);
                 if (!response) {
+                    // Notification or response-only message: 202 Accepted, no body
                     this.sendNotificationAccepted(res);
                     return;
                 }
 
-                res.writeHead(200);
-                res.end(JSON.stringify(response));
+                if (wantsSSE) {
+                    // Send response as SSE event and keep connection open as transport channel
+                    this.sendSSEResponse(req, res, sessionId, [response]);
+                } else {
+                    res.writeHead(200);
+                    res.end(JSON.stringify(response));
+                }
             } catch (error: any) {
                 console.error('Error handling MCP request:', error);
-                res.writeHead(400);
-                res.end(JSON.stringify({
-                    jsonrpc: '2.0',
-                    id: null,
-                    error: {
-                        code: -32700,
-                        message: `Parse error: ${error.message}`
-                    }
-                }));
+                if (!res.headersSent) {
+                    res.writeHead(400);
+                    res.end(JSON.stringify({
+                        jsonrpc: '2.0',
+                        id: null,
+                        error: {
+                            code: -32700,
+                            message: `Parse error: ${error.message}`
+                        }
+                    }));
+                }
             }
         });
+    }
+
+    // Streamable HTTP (2025-03-26): respond with SSE and keep the POST connection open
+    // so the rmcp transport worker stays alive for the full session lifetime.
+    private sendSSEResponse(req: http.IncomingMessage, res: http.ServerResponse, sessionId: string, events: any[]): void {
+        res.writeHead(200, {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'Mcp-Session-Id': sessionId,
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Expose-Headers': 'Mcp-Session-Id',
+        });
+
+        for (const event of events) {
+            res.write(`data: ${JSON.stringify(event)}\n\n`);
+        }
+
+        // Register as the SSE push channel for this session
+        this.sseConnections.set(sessionId, res);
+        this.touchClient(sessionId);
+
+        const heartbeat = setInterval(() => {
+            if (res.writableEnded) {
+                clearInterval(heartbeat);
+                if (this.sseConnections.get(sessionId) === res) {
+                    this.sseConnections.delete(sessionId);
+                }
+                return;
+            }
+            res.write(': ping\n\n');
+        }, 30000);
+
+        req.on('close', () => {
+            clearInterval(heartbeat);
+            if (this.sseConnections.get(sessionId) === res) {
+                this.sseConnections.delete(sessionId);
+                this.clients.delete(sessionId);
+            }
+            console.log(`[MCPServer] POST SSE channel closed: ${sessionId}`);
+        });
+
+        console.log(`[MCPServer] POST SSE channel opened: ${sessionId}`);
     }
 
     private async handleMessage(message: any, sessionId?: string): Promise<any | null> {
@@ -324,7 +393,7 @@ export class MCPServer {
                     // MCP initialization
                     this.touchClient(sessionId);
                     result = {
-                        protocolVersion: '2024-11-05',
+                        protocolVersion: '2025-03-26',
                         capabilities: {
                             tools: {
                                 listChanged: false
@@ -379,12 +448,137 @@ export class MCPServer {
     }
 
     private sendNotificationAccepted(res: http.ServerResponse): void {
+        // MCP 2025-03-26: notifications/responses that need no reply → 202 Accepted, empty body
+        res.writeHead(202);
+        res.end();
+    }
+
+    // Streamable HTTP Transport (MCP 2025-03-26): GET /mcp opens a persistent SSE stream
+    private async handleMCPSSEConnection(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+        const sessionId = this.resolveSessionId(req) || uuidv4();
+
+        res.writeHead(200, {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'Mcp-Session-Id': sessionId,
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Expose-Headers': 'Mcp-Session-Id',
+        });
+
+        this.sseConnections.set(sessionId, res);
+        this.touchClient(sessionId);
+
+        const heartbeat = setInterval(() => {
+            if (res.writableEnded) {
+                clearInterval(heartbeat);
+                return;
+            }
+            res.write(': ping\n\n');
+        }, 30000);
+
+        req.on('close', () => {
+            clearInterval(heartbeat);
+            this.sseConnections.delete(sessionId);
+            this.clients.delete(sessionId);
+            console.log(`[MCPServer] Streamable HTTP SSE stream closed: ${sessionId}`);
+        });
+
+        console.log(`[MCPServer] Streamable HTTP SSE stream opened: ${sessionId}`);
+    }
+
+    // Streamable HTTP Transport (MCP 2025-03-26): DELETE /mcp terminates a session
+    private async handleMCPSessionDelete(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+        const sessionId = this.resolveSessionId(req);
+        if (sessionId) {
+            const sseRes = this.sseConnections.get(sessionId);
+            if (sseRes && !sseRes.writableEnded) {
+                sseRes.end();
+            }
+            this.sseConnections.delete(sessionId);
+            this.clients.delete(sessionId);
+            console.log(`[MCPServer] Session terminated via DELETE: ${sessionId}`);
+        }
         res.writeHead(200);
-        res.end(JSON.stringify({
-            jsonrpc: '2.0',
-            id: null,
-            result: {}
-        }));
+        res.end();
+    }
+
+    private async handleSSEConnection(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+        const sessionId = uuidv4();
+
+        res.writeHead(200, {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization, Mcp-Session-Id, mcp-session-id',
+        });
+
+        this.sseConnections.set(sessionId, res);
+        this.touchClient(sessionId);
+
+        const postEndpoint = `/message?sessionId=${sessionId}`;
+        res.write(`event: endpoint\ndata: ${postEndpoint}\n\n`);
+
+        const heartbeat = setInterval(() => {
+            if (res.writableEnded) {
+                clearInterval(heartbeat);
+                return;
+            }
+            res.write(': ping\n\n');
+        }, 30000);
+
+        req.on('close', () => {
+            clearInterval(heartbeat);
+            this.sseConnections.delete(sessionId);
+            this.clients.delete(sessionId);
+            console.log(`[MCPServer] SSE client disconnected: ${sessionId}`);
+        });
+
+        console.log(`[MCPServer] SSE client connected: ${sessionId}, endpoint: ${postEndpoint}`);
+    }
+
+    private async handleSSEMessage(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+        const parsedUrl = url.parse(req.url || '', true);
+        const sessionId = parsedUrl.query.sessionId as string;
+
+        if (!sessionId) {
+            res.writeHead(400);
+            res.end(JSON.stringify({ error: 'Missing sessionId' }));
+            return;
+        }
+
+        const sseRes = this.sseConnections.get(sessionId);
+        if (!sseRes || sseRes.writableEnded) {
+            res.writeHead(400);
+            res.end(JSON.stringify({ error: 'SSE session not found or closed' }));
+            return;
+        }
+
+        let body = '';
+        req.on('data', (chunk) => { body += chunk.toString(); });
+        req.on('end', async () => {
+            try {
+                const message = JSON.parse(body);
+                this.touchClient(sessionId);
+
+                const response = await this.handleMessage(message, sessionId);
+
+                if (response !== null) {
+                    sseRes.write(`data: ${JSON.stringify(response)}\n\n`);
+                }
+
+                res.writeHead(202);
+                res.end();
+            } catch (error: any) {
+                console.error('[MCPServer] SSE message error:', error);
+                res.writeHead(500);
+                res.end(JSON.stringify({ error: error.message }));
+            }
+        });
     }
 
     private resolveSessionId(req: http.IncomingMessage): string {
@@ -436,6 +630,7 @@ export class MCPServer {
         }
 
         this.clients.clear();
+        this.sseConnections.clear();
     }
 
     public getStatus(): ServerStatus {
