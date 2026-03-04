@@ -3,6 +3,8 @@ import { MCPServer } from './mcp-server';
 import { readSettings, saveSettings } from './settings';
 import { MCPServerSettings } from './types';
 import { ToolManager } from './tools/tool-manager';
+import { MCPConfigManager } from './mcp-config-manager';
+import { ClientType, MCP_CLIENTS, MCPServerConfig } from './mcp-client-configs';
 
 type IncomingSettings = Partial<MCPServerSettings> & {
     debugLog?: boolean;
@@ -96,6 +98,16 @@ export const methods: { [key: string]: (...any: any) => any } = {
      */
     openPanel() {
         Editor.Panel.open('cocos-mcp-server');
+    },
+
+    /**
+     * @en Open tool manager panel
+     * @zh 打开工具管理面板
+     */
+    openToolManager() {
+        // 当前项目仅保留主面板，工具管理在主面板 Tab 内。
+        Editor.Panel.open('cocos-mcp-server');
+        return { success: true };
     },
 
 
@@ -321,7 +333,174 @@ export const methods: { [key: string]: (...any: any) => any } = {
 
     async getEnabledTools() {
         return toolManager.getEnabledTools();
-    }
+    },
+
+    /**
+     * @en Get configuration status for all AI clients
+     * @zh 获取所有 AI 客户端配置状态
+     */
+    async getConfigStatus(serverName: string) {
+        try {
+            return {
+                success: true,
+                clients: MCPConfigManager.getConfigStatus(serverName),
+            };
+        } catch (error: any) {
+            return {
+                success: false,
+                message: error?.message || String(error),
+                clients: [],
+            };
+        }
+    },
+
+    /**
+     * @en Generate CLI commands
+     * @zh 生成 CLI 配置命令
+     */
+    async generateCLICommands(serverConfig: MCPServerConfig & { scope?: 'user' | 'project' }) {
+        try {
+            return {
+                success: true,
+                commands: MCPConfigManager.generateCLICommands(serverConfig),
+            };
+        } catch (error: any) {
+            return {
+                success: false,
+                message: error?.message || String(error),
+                commands: { claude: '', gemini: '' },
+            };
+        }
+    },
+
+    /**
+     * @en Generate config content for one client
+     * @zh 生成单客户端配置内容
+     */
+    async generateClientConfig(clientType: ClientType, serverConfig: MCPServerConfig) {
+        try {
+            return {
+                success: true,
+                content: MCPConfigManager.generateConfigContent(clientType, serverConfig),
+            };
+        } catch (error: any) {
+            return {
+                success: false,
+                message: error?.message || String(error),
+                content: '',
+            };
+        }
+    },
+
+    /**
+     * @en Add MCP server to one client config
+     * @zh 添加 MCP 服务到指定客户端配置
+     */
+    async addToClient(clientType: ClientType, serverConfig: MCPServerConfig) {
+        return MCPConfigManager.addServer(clientType, serverConfig);
+    },
+
+    /**
+     * @en Remove MCP server from one client config
+     * @zh 从指定客户端移除 MCP 服务
+     */
+    async removeFromClient(clientType: ClientType, serverName: string) {
+        return MCPConfigManager.removeServer(clientType, serverName);
+    },
+
+    /**
+     * @en Add MCP server to all auto-config clients
+     * @zh 添加 MCP 服务到全部可自动配置客户端
+     */
+    async addToAllClients(serverConfig: MCPServerConfig) {
+        try {
+            const results = MCPConfigManager.addToAllClients(serverConfig);
+            const formattedResults: Record<string, string> = {};
+            for (const [clientType, result] of results.entries()) {
+                formattedResults[MCP_CLIENTS[clientType].name] = result.message;
+            }
+            return {
+                success: true,
+                results: formattedResults,
+            };
+        } catch (error: any) {
+            return {
+                success: false,
+                message: error?.message || String(error),
+                results: {},
+            };
+        }
+    },
+
+    /**
+     * @en Remove MCP server from all auto-config clients
+     * @zh 从全部可自动配置客户端移除 MCP 服务
+     */
+    async removeFromAllClients(serverName: string) {
+        try {
+            const results = MCPConfigManager.removeFromAllClients(serverName);
+            const formattedResults: Record<string, string> = {};
+            for (const [clientType, result] of results.entries()) {
+                formattedResults[MCP_CLIENTS[clientType].name] = result.message;
+            }
+            return {
+                success: true,
+                results: formattedResults,
+            };
+        } catch (error: any) {
+            return {
+                success: false,
+                message: error?.message || String(error),
+                results: {},
+            };
+        }
+    },
+
+    /**
+     * @en Open client config file in system default app
+     * @zh 使用系统默认程序打开客户端配置文件
+     */
+    async openConfigFile(configPath: string) {
+        try {
+            let expandedPath = configPath;
+            if (expandedPath.startsWith('~')) {
+                const home = process.env.HOME || process.env.USERPROFILE;
+                if (home) {
+                    expandedPath = expandedPath.replace('~', home);
+                }
+            }
+
+            if (process.platform === 'win32') {
+                expandedPath = expandedPath.replace(/%([^%]+)%/g, (_: string, key: string) => process.env[key] || '');
+            }
+
+            const { exec } = require('child_process') as { exec: (cmd: string, cb?: (error: any) => void) => void };
+            let command: string;
+            if (process.platform === 'darwin') {
+                command = `open "${expandedPath}"`;
+            } else if (process.platform === 'win32') {
+                command = `start "" "${expandedPath}"`;
+            } else {
+                command = `xdg-open "${expandedPath}"`;
+            }
+
+            exec(command, (error: any) => {
+                if (error) {
+                    console.error('[MCP插件] Failed to open config file:', error);
+                }
+            });
+
+            return {
+                success: true,
+                message: `已打开配置文件: ${expandedPath}`,
+            };
+        } catch (error: any) {
+            return {
+                success: false,
+                message: `打开配置文件失败: ${error?.message || String(error)}`,
+            };
+        }
+    },
 };
 
 /**

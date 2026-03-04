@@ -1,27 +1,16 @@
 # Cocos MCP Server（CreatorFramework Fork）
 
-**[📖 English](README.EN.md)**  **[📖 中文](README.md)**
+**[English](README.EN.md) | [中文](README.md)**
 
-这是基于上游 `DaxianLee/cocos-mcp-server` 的维护分支。本文档聚焦本仓库的实际改动，不再重复上游的大篇幅通用说明。
+本仓库是 `DaxianLee/cocos-mcp-server` 的维护分支，当前文档已与代码状态对齐到 **v1.5.4**。
 
-## 界面预览
+## 项目定位
 
-### 主控制台
-
-![MCP 主控制台](image/main-ui.jpg)
-
-### MCP 工具菜单
-
-![MCP 工具菜单](image/tools-ui.jpg)
-
-## 我们的核心变更
-
-- 面板前端重构：从旧模板改为 `Vite + Vue 3 + Tailwind CSS + Element Plus`。
-- 无用文件清理：移除冗余/废弃文件，收敛项目结构并降低维护成本。
-- 服务器控制增强：新增 `restart-server-from-dist` 热重启能力，完善设置更新后的服务重建流程。
-- MCP 兼容性增强：补充会话 ID 管理、notification 请求处理、JSON 容错解析。
-- 工具能力补强：新增/完善 `set_component_properties` 等批量组件属性操作。
-- UI/交互优化：分类工具开关、启用统计、保存态反馈、状态轮询与提示消息。
+- 面板技术栈：`Vue 3 + Element Plus + Vite`
+- 后端构建：`tsc`
+- 传输协议：`Streamable HTTP (MCP 2025-03-26)`
+- MCP 对外工具：`50`（13 类）
+- `sceneAdvanced`：已完全移除，不在工具暴露面
 
 ## 快速开始
 
@@ -31,46 +20,77 @@ npm install
 npm run build
 ```
 
-仅构建面板前端：
+只构建面板：
 
 ```bash
 npm run build:panel
 ```
 
-开发模式：
+只构建后端 TypeScript：
 
 ```bash
-npm run watch
+npm run build:ts
 ```
 
 ## MCP 连接地址
 
-服务启动后默认地址：`http://127.0.0.1:3000/mcp`
-
-Claude CLI 示例：
-
-```bash
-claude mcp add --transport http cocos-creator http://127.0.0.1:3000/mcp
-```
-
-## 仓库结构（当前重点）
+默认地址：
 
 ```text
-cocos-mcp-server/
-├── source/                    # 插件主逻辑与 MCP 服务
-├── panel-ui/                  # 新面板前端工程（Vue + Vite）
-├── dist/                      # 构建产物（含 dist/panel-ui）
-├── vite.panel.config.ts       # 面板构建配置
-├── tailwind.config.ts         # Tailwind 配置
-└── package.json               # 脚本与扩展声明
+http://127.0.0.1:3000/mcp
 ```
 
-## 与上游关系
+## AI 客户端配置概览
 
-- 上游仓库：`https://github.com/DaxianLee/cocos-mcp-server`
-- 本仓库定位：用于 CreatorFramework 团队的功能迭代与稳定性维护。
-- 若与上游文档描述不一致，以本仓库代码和本 README 为准。
+- 自动写入：`Cursor`、`Windsurf`、`Trea CN`、`Codex CLI`
+- 手动命令：`Claude CLI`、`Gemini CLI`
+- 面板能力：状态查询、配置片段生成、CLI 命令生成、单客户端/批量写入与移除、配置文件打开
 
-## 许可证
+主进程消息（文档可见接口）：
 
-沿用上游仓库许可证与使用约束。
+- `get-config-status`
+- `generate-cli-commands`
+- `generate-client-config`
+- `add-to-client` / `remove-from-client`
+- `add-to-all-clients` / `remove-from-all-clients`
+- `open-config-file`
+- `open-tool-manager`
+
+## 工具能力概览（50）
+
+| 类别 | 数量 |
+|---|---:|
+| scene | 5 |
+| node | 8 |
+| component | 4 |
+| prefab | 4 |
+| project | 2 |
+| debug | 3 |
+| preferences | 3 |
+| server | 2 |
+| broadcast | 2 |
+| sceneView | 5 |
+| referenceImage | 4 |
+| assetAdvanced | 5 |
+| validation | 3 |
+
+调用命名规范：使用 `分类_工具名`（例如 `node_node_query`、`scene_scene_management`）。
+
+## 文档导航
+
+- 安装说明（中文）：[INSTALL.md](INSTALL.md)
+- Installation (English): [INSTALL.EN.md](INSTALL.EN.md)
+- 功能指南（中文）：[FEATURE_GUIDE_CN.md](FEATURE_GUIDE_CN.md)
+- Feature Guide (English): [FEATURE_GUIDE_EN.md](FEATURE_GUIDE_EN.md)
+
+## 变更摘要（相对旧文档）
+
+- 工具数量与分类已按当前实现重新对齐。
+- 删除已下线工具分类的对外暴露描述。
+- 增加 AI 客户端配置能力说明。
+- 保持当前仓库前端与构建事实（`Vue + Element Plus + Vite` + `tsc`）。
+
+## 上游关系
+
+- Upstream: `https://github.com/DaxianLee/cocos-mcp-server`
+- 如与上游文档不一致，以本仓库代码与本文档为准。

@@ -11,7 +11,6 @@ import { DebugTools } from './tools/debug-tools';
 import { PreferencesTools } from './tools/preferences-tools';
 import { ServerTools } from './tools/server-tools';
 import { BroadcastTools } from './tools/broadcast-tools';
-import { SceneAdvancedTools } from './tools/scene-advanced-tools';
 import { SceneViewTools } from './tools/scene-view-tools';
 import { ReferenceImageTools } from './tools/reference-image-tools';
 import { AssetAdvancedTools } from './tools/asset-advanced-tools';
@@ -43,7 +42,6 @@ export class MCPServer {
             this.tools.preferences = new PreferencesTools();
             this.tools.server = new ServerTools();
             this.tools.broadcast = new BroadcastTools();
-            this.tools.sceneAdvanced = new SceneAdvancedTools();
             this.tools.sceneView = new SceneViewTools();
             this.tools.referenceImage = new ReferenceImageTools();
             this.tools.assetAdvanced = new AssetAdvancedTools();
@@ -95,6 +93,9 @@ export class MCPServer {
         // 如果没有启用工具配置，返回所有工具
         if (!this.enabledTools || this.enabledTools.length === 0) {
             for (const [category, toolSet] of Object.entries(this.tools)) {
+                if (category === 'sceneAdvanced') {
+                    continue;
+                }
                 const tools = toolSet.getTools();
                 for (const tool of tools) {
                     this.toolsList.push({
@@ -109,6 +110,9 @@ export class MCPServer {
             const enabledToolNames = new Set(this.enabledTools.map(tool => `${tool.category}_${tool.name}`));
             
             for (const [category, toolSet] of Object.entries(this.tools)) {
+                if (category === 'sceneAdvanced') {
+                    continue;
+                }
                 const tools = toolSet.getTools();
                 for (const tool of tools) {
                     const toolName = `${category}_${tool.name}`;
@@ -143,7 +147,6 @@ export class MCPServer {
         if (this.tools[category]) {
             return await this.tools[category].execute(toolMethodName, args);
         }
-        
         throw new Error(`Tool ${toolName} not found`);
     }
 

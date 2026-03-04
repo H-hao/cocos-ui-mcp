@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import AiClientConfigPanel from './components/AiClientConfigPanel.vue';
 import ConnectionInfoCard from './components/ConnectionInfoCard.vue';
 import ServerSettingsForm from './components/ServerSettingsForm.vue';
 import ServerStatusCard from './components/ServerStatusCard.vue';
@@ -9,7 +10,7 @@ import ToolsOverview from './components/ToolsOverview.vue';
 import { useServerState } from './composables/useServerState';
 import { useToolManager } from './composables/useToolManager';
 
-const activeTab = ref<'server' | 'tools'>('server');
+const activeTab = ref<'server' | 'tools' | 'ai'>('server');
 
 const {
     settings,
@@ -58,7 +59,14 @@ const toolSections = computed(() => {
 });
 
 const switchTab = (tabName: string | number) => {
-    activeTab.value = tabName === 'tools' ? 'tools' : 'server';
+    if (tabName === 'tools') {
+        activeTab.value = 'tools';
+    } else if (tabName === 'ai') {
+        activeTab.value = 'ai';
+    } else {
+        activeTab.value = 'server';
+    }
+
     if (activeTab.value === 'tools') {
         void loadToolManagerState();
     }
@@ -156,6 +164,10 @@ onUnmounted(() => {
                         />
                     </div>
                 </div>
+            </el-tab-pane>
+
+            <el-tab-pane label="AI客户端配置" name="ai">
+                <AiClientConfigPanel :server-port="normalizedSettings.port" />
             </el-tab-pane>
         </el-tabs>
 

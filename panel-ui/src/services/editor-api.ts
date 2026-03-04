@@ -1,8 +1,16 @@
 import type {
+    BatchClientOperationResult,
+    CLICommandsResult,
+    ClientConfigResult,
+    ConfigOperationResult,
+    ConfigStatusResult,
+    MCPServerConfigPayload,
+    OpenConfigFileResult,
     ServerSettings,
     ServerStatus,
     ToolManagerState,
     ToolStatusUpdate,
+    AiClientType,
 } from '../types/contracts';
 
 const EXTENSION_NAME = 'cocos-mcp-server';
@@ -66,4 +74,40 @@ export function updateToolStatus(category: string, name: string, enabled: boolea
 
 export function updateToolStatusBatch(updates: ToolStatusUpdate[]): Promise<{ success: boolean }> {
     return requestEditor<{ success: boolean }>('updateToolStatusBatch', updates);
+}
+
+export function getConfigStatus(serverName: string): Promise<ConfigStatusResult> {
+    return requestEditor<ConfigStatusResult>('get-config-status', serverName);
+}
+
+export function generateCLICommands(payload: MCPServerConfigPayload): Promise<CLICommandsResult> {
+    return requestEditor<CLICommandsResult>('generate-cli-commands', payload);
+}
+
+export function generateClientConfig(clientType: AiClientType, payload: MCPServerConfigPayload): Promise<ClientConfigResult> {
+    return requestEditor<ClientConfigResult>('generate-client-config', clientType, payload);
+}
+
+export function addToClient(clientType: AiClientType, payload: MCPServerConfigPayload): Promise<ConfigOperationResult> {
+    return requestEditor<ConfigOperationResult>('add-to-client', clientType, payload);
+}
+
+export function removeFromClient(clientType: AiClientType, serverName: string): Promise<ConfigOperationResult> {
+    return requestEditor<ConfigOperationResult>('remove-from-client', clientType, serverName);
+}
+
+export function addToAllClients(payload: MCPServerConfigPayload): Promise<BatchClientOperationResult> {
+    return requestEditor<BatchClientOperationResult>('add-to-all-clients', payload);
+}
+
+export function removeFromAllClients(serverName: string): Promise<BatchClientOperationResult> {
+    return requestEditor<BatchClientOperationResult>('remove-from-all-clients', serverName);
+}
+
+export function openConfigFile(configPath: string): Promise<OpenConfigFileResult> {
+    return requestEditor<OpenConfigFileResult>('open-config-file', configPath);
+}
+
+export function openToolManager(): Promise<{ success: boolean }> {
+    return requestEditor<{ success: boolean }>('open-tool-manager');
 }

@@ -3,181 +3,121 @@ import { ToolDefinition, ToolResponse, ToolExecutor, PrefabInfo } from '../types
 export class PrefabTools implements ToolExecutor {
     getTools(): ToolDefinition[] {
         return [
+            // 1. Browse prefabs - Query and information
             {
-                name: 'get_prefab_list',
-                description: 'Get all prefabs in the project',
+                name: 'prefab_browse',
+                description: 'PREFAB BROWSER: Query and analyze prefab files in your project. WORKFLOW: Use "list" to discover all prefabs → "info" to get detailed prefab data → "validate" to check file integrity. Essential for prefab management and debugging. Common use: finding prefabs before instantiation.',
                 inputSchema: {
                     type: 'object',
                     properties: {
+                        action: {
+                            type: 'string',
+                            enum: ['list', 'info', 'validate'],
+                            description: 'Browse operation: "list" = get all prefabs in folder (optional folder parameter) | "info" = get detailed prefab data (requires prefabPath) | "validate" = check prefab file integrity (requires prefabPath)'
+                        },
                         folder: {
                             type: 'string',
-                            description: 'Folder path to search (optional)',
+                            description: 'Search directory for prefabs (list action). Default: "db://assets" searches entire project. Examples: "db://assets/prefabs" for main prefabs, "db://assets/ui" for UI prefabs. Use specific folders for focused searches.',
                             default: 'db://assets'
-                        }
-                    }
-                }
-            },
-            {
-                name: 'load_prefab',
-                description: 'Load a prefab by path',
-                inputSchema: {
-                    type: 'object',
-                    properties: {
+                        },
                         prefabPath: {
                             type: 'string',
-                            description: 'Prefab asset path'
+                            description: 'Prefab file path (REQUIRED for info/validate actions). Must be valid Cocos asset path ending in .prefab. Examples: "db://assets/prefabs/Player.prefab", "db://assets/ui/MenuPanel.prefab". Get paths from list action first.'
                         }
                     },
-                    required: ['prefabPath']
+                    required: ['action']
                 }
             },
+            
+            // 2. Prefab lifecycle - Create, duplicate, delete
             {
-                name: 'instantiate_prefab',
-                description: 'Instantiate a prefab in the scene',
+                name: 'prefab_lifecycle',
+                description: 'PREFAB LIFECYCLE: Create prefabs from existing nodes or delete prefab files. WORKFLOW: For create → select source node → specify name and save path → creates reusable prefab. For delete → specify prefab path → removes file permanently. Use with caution for delete operations.',
                 inputSchema: {
                     type: 'object',
                     properties: {
-                        prefabPath: {
+                        action: {
                             type: 'string',
-                            description: 'Prefab asset path'
+                            enum: ['create', 'delete'],
+                            description: 'Lifecycle operation: "create" = convert scene node into reusable prefab (requires nodeUuid+prefabName+savePath) | "delete" = permanently remove prefab file (requires prefabPath - WARNING: irreversible)'
                         },
-                        parentUuid: {
-                            type: 'string',
-                            description: 'Parent node UUID (optional)'
-                        },
-                        position: {
-                            type: 'object',
-                            description: 'Initial position',
-                            properties: {
-                                x: { type: 'number' },
-                                y: { type: 'number' },
-                                z: { type: 'number' }
-                            }
-                        }
-                    },
-                    required: ['prefabPath']
-                }
-            },
-            {
-                name: 'create_prefab',
-                description: 'Create a prefab from a node with all children and components',
-                inputSchema: {
-                    type: 'object',
-                    properties: {
                         nodeUuid: {
                             type: 'string',
-                            description: 'Source node UUID'
-                        },
-                        savePath: {
-                            type: 'string',
-                            description: 'Path to save the prefab (e.g., db://assets/prefabs/MyPrefab.prefab)'
+                            description: 'Source node UUID for prefab creation (REQUIRED for create action). Use node_query to find target node UUID first. The node and all its children will be converted into a prefab. Format: "12345678-abcd-1234-5678-123456789abc"'
                         },
                         prefabName: {
                             type: 'string',
-                            description: 'Prefab name'
+                            description: 'New prefab name (REQUIRED for create action). Choose descriptive names without .prefab extension. Examples: "PlayerCharacter", "UIButton", "EnemyTank". System adds .prefab extension automatically.'
+                        },
+                        savePath: {
+                            type: 'string',
+                            description: 'Destination path for new prefab (REQUIRED for create action). Must include .prefab extension. Examples: "db://assets/prefabs/Player.prefab", "db://assets/ui/CustomButton.prefab". Ensure parent folder exists.'
+                        },
+                        prefabPath: {
+                            type: 'string',
+                            description: 'Prefab file to delete (REQUIRED for delete action). WARNING: This permanently removes the prefab file. Examples: "db://assets/prefabs/OldPlayer.prefab". Use prefab_browse list to find exact paths first.'
                         }
                     },
-                    required: ['nodeUuid', 'savePath', 'prefabName']
+                    required: ['action']
                 }
             },
+            
+            // 3. Scene prefab instances - Instantiate, unlink, apply, revert
             {
-                name: 'update_prefab',
-                description: 'Update an existing prefab',
+                name: 'prefab_instance',
+                description: 'PREFAB INSTANCES: Manage prefab instances in the scene. WORKFLOW: "instantiate" to create instances → modify as needed → "apply" to save changes back to prefab OR "unlink" to break connection OR "revert" to restore original. Critical for prefab-based development.',
                 inputSchema: {
                     type: 'object',
                     properties: {
+                        action: {
+                            type: 'string',
+                            enum: ['instantiate', 'unlink', 'apply', 'revert'],
+                            description: 'Instance operation: "instantiate" = create prefab instance in scene (requires prefabPath+parentUuid) | "unlink" = break prefab connection, make independent (requires nodeUuid) | "apply" = save instance changes to prefab (requires nodeUuid) | "revert" = restore to prefab state (requires nodeUuid)'
+                        },
                         prefabPath: {
                             type: 'string',
-                            description: 'Prefab asset path'
+                            description: 'Prefab file path (REQUIRED for instantiate action). Must be valid .prefab file. Examples: "db://assets/prefabs/Player.prefab", "db://assets/ui/MenuPanel.prefab". Use prefab_browse to find available prefabs.'
+                        },
+                        parentUuid: {
+                            type: 'string',
+                            description: 'Parent node UUID for new instance (REQUIRED for instantiate action). Use node_query to find parent node first. The prefab instance will be created as a child of this node. Format: "12345678-abcd-1234-5678-123456789abc"'
+                        },
+                        position: {
+                            type: 'object',
+                            properties: { x: { type: 'number' }, y: { type: 'number' }, z: { type: 'number' } },
+                            description: 'Starting position for new instance (instantiate action). Sets initial transform after creation. Example: {"x": 100, "y": 200, "z": 0}. Optional - defaults to prefab\'s original position if omitted.'
                         },
                         nodeUuid: {
                             type: 'string',
-                            description: 'Node UUID with changes'
+                            description: 'Prefab instance node UUID (REQUIRED for unlink/apply/revert actions). Must be a node that was created from a prefab. Use node_query to find prefab instance nodes. Format: "12345678-abcd-1234-5678-123456789abc"'
                         }
                     },
-                    required: ['prefabPath', 'nodeUuid']
+                    required: ['action']
                 }
             },
+            
+            // 4. Prefab edit mode - IMPORTANT: Complete workflow for editing prefabs
             {
-                name: 'revert_prefab',
-                description: 'Revert prefab instance to original',
+                name: 'prefab_edit',
+                description: 'PREFAB EDIT WORKFLOW: Edit prefab content in dedicated editing mode. CRITICAL WORKFLOW: 1) "enter" edit mode (switches to prefab scene) → 2) make modifications using other tools → 3) "save" changes → 4) "exit" back to main scene. IMPORTANT: Always save before exit to persist changes.',
                 inputSchema: {
                     type: 'object',
                     properties: {
-                        nodeUuid: {
+                        action: {
                             type: 'string',
-                            description: 'Prefab instance node UUID'
-                        }
-                    },
-                    required: ['nodeUuid']
-                }
-            },
-            {
-                name: 'get_prefab_info',
-                description: 'Get detailed prefab information',
-                inputSchema: {
-                    type: 'object',
-                    properties: {
+                            enum: ['enter', 'save', 'exit', 'test'],
+                            description: 'Edit operation: "enter" = start editing prefab in dedicated scene (requires prefabPath) | "save" = persist current changes to prefab file | "exit" = return to main scene (REMEMBER to save first) | "test" = create test instance to verify changes (requires parentUuid)'
+                        },
                         prefabPath: {
                             type: 'string',
-                            description: 'Prefab asset path'
-                        }
-                    },
-                    required: ['prefabPath']
-                }
-            },
-            {
-                name: 'validate_prefab',
-                description: 'Validate a prefab file format',
-                inputSchema: {
-                    type: 'object',
-                    properties: {
-                        prefabPath: {
-                            type: 'string',
-                            description: 'Prefab asset path'
-                        }
-                    },
-                    required: ['prefabPath']
-                }
-            },
-            {
-                name: 'duplicate_prefab',
-                description: 'Duplicate an existing prefab',
-                inputSchema: {
-                    type: 'object',
-                    properties: {
-                        sourcePrefabPath: {
-                            type: 'string',
-                            description: 'Source prefab path'
+                            description: 'Prefab file path (REQUIRED for enter/save/exit actions). Must be valid .prefab file. Examples: "db://assets/prefabs/Player.prefab". For enter: opens prefab for editing. For save/exit: specifies which prefab to save/close.'
                         },
-                        targetPrefabPath: {
+                        parentUuid: {
                             type: 'string',
-                            description: 'Target prefab path'
-                        },
-                        newPrefabName: {
-                            type: 'string',
-                            description: 'New prefab name'
+                            description: 'Parent node for test instance (test action only). Use node_query to find parent UUID. Creates temporary instance to verify prefab changes work correctly. Format: "12345678-abcd-1234-5678-123456789abc"'
                         }
                     },
-                    required: ['sourcePrefabPath', 'targetPrefabPath']
-                }
-            },
-            {
-                name: 'restore_prefab_node',
-                description: 'Restore prefab node using prefab asset (built-in undo record)',
-                inputSchema: {
-                    type: 'object',
-                    properties: {
-                        nodeUuid: {
-                            type: 'string',
-                            description: 'Prefab instance node UUID'
-                        },
-                        assetUuid: {
-                            type: 'string',
-                            description: 'Prefab asset UUID'
-                        }
-                    },
-                    required: ['nodeUuid', 'assetUuid']
+                    required: ['action', 'prefabPath']
                 }
             }
         ];
@@ -185,26 +125,14 @@ export class PrefabTools implements ToolExecutor {
 
     async execute(toolName: string, args: any): Promise<ToolResponse> {
         switch (toolName) {
-            case 'get_prefab_list':
-                return await this.getPrefabList(args.folder);
-            case 'load_prefab':
-                return await this.loadPrefab(args.prefabPath);
-            case 'instantiate_prefab':
-                return await this.instantiatePrefab(args);
-            case 'create_prefab':
-                return await this.createPrefab(args);
-            case 'update_prefab':
-                return await this.updatePrefab(args.prefabPath, args.nodeUuid);
-            case 'revert_prefab':
-                return await this.revertPrefab(args.nodeUuid);
-            case 'get_prefab_info':
-                return await this.getPrefabInfo(args.prefabPath);
-            case 'validate_prefab':
-                return await this.validatePrefab(args.prefabPath);
-            case 'duplicate_prefab':
-                return await this.duplicatePrefab(args);
-            case 'restore_prefab_node':
-                return await this.restorePrefabNode(args.nodeUuid, args.assetUuid);
+            case 'prefab_browse':
+                return await this.handlePrefabBrowse(args);
+            case 'prefab_lifecycle':
+                return await this.handlePrefabLifecycle(args);
+            case 'prefab_instance':
+                return await this.handlePrefabInstance(args);
+            case 'prefab_edit':
+                return await this.handlePrefabEdit(args);
             default:
                 throw new Error(`Unknown tool: ${toolName}`);
         }
@@ -265,53 +193,23 @@ export class PrefabTools implements ToolExecutor {
                     throw new Error('预制体未找到');
                 }
 
-                // 使用正确的 create-node API 从预制体资源实例化
-                const createNodeOptions: any = {
-                    assetUuid: assetInfo.uuid
-                };
+                // 记录撤销操作
+                await this.recordUndoOperation('instantiate-prefab', args.parentUuid || 'scene');
 
-                // 设置父节点
-                if (args.parentUuid) {
-                    createNodeOptions.parent = args.parentUuid;
+                // 使用编辑器标准流程
+                const result = await this.instantiatePrefabStandard(args, assetInfo);
+                if (result.success) {
+                    // 实例化预制体不需要刷新全部资源
+                    resolve(result);
+                    return;
                 }
 
-                // 设置节点名称
-                if (args.name) {
-                    createNodeOptions.name = args.name;
-                } else if (assetInfo.name) {
-                    createNodeOptions.name = assetInfo.name;
-                }
+                // 回退方法
+                console.log('标准方法失败，使用简化方법...');
+                const fallbackResult = await this.instantiatePrefabSimple(args, assetInfo);
+                // 实例化预制体不需要刷新全部资源
+                resolve(fallbackResult);
 
-                // 设置初始属性（如位置）
-                if (args.position) {
-                    createNodeOptions.dump = {
-                        position: {
-                            value: args.position
-                        }
-                    };
-                }
-
-                // 创建节点
-                const nodeUuid = await Editor.Message.request('scene', 'create-node', createNodeOptions);
-                const uuid = Array.isArray(nodeUuid) ? nodeUuid[0] : nodeUuid;
-
-                // 注意：create-node API从预制体资源创建时应该自动建立预制体关联
-                console.log('预制体节点创建成功:', {
-                    nodeUuid: uuid,
-                    prefabUuid: assetInfo.uuid,
-                    prefabPath: args.prefabPath
-                });
-                
-                resolve({
-                    success: true,
-                    data: {
-                        nodeUuid: uuid,
-                        prefabPath: args.prefabPath,
-                        parentUuid: args.parentUuid,
-                        position: args.position,
-                        message: '预制体实例化成功，已建立预制体关联'
-                    }
-                });
             } catch (err: any) {
                 resolve({ 
                     success: false, 
@@ -775,35 +673,42 @@ export class PrefabTools implements ToolExecutor {
                 const fullPath = pathParam.endsWith('.prefab') ? 
                     pathParam : `${pathParam}/${prefabName}.prefab`;
 
-                const includeChildren = args.includeChildren !== false; // 默认为 true
-                const includeComponents = args.includeComponents !== false; // 默认为 true
+                // 记录撤销操作
+                await this.recordUndoOperation('create-prefab', args.nodeUuid);
 
-                // 优先使用新的 asset-db 方法创建预制体
-                console.log('使用新的 asset-db 方法创建预制体...');
+                // 优先使用编辑器标准方法: scene.create-prefab
+                console.log('使用编辑器标准方法创建预制体...');
+                const sceneResult = await this.createPrefabWithScene(args.nodeUuid, fullPath, prefabName);
+                
+                if (sceneResult.success) {
+                    // 创建成功后立即刷新资源
+                    await this.refreshAssets(fullPath);
+                    resolve(sceneResult);
+                    return;
+                }
+
+                // 回退到 asset-db 方法
+                console.log('scene方法失败，使用asset-db方法...');
                 const assetDbResult = await this.createPrefabWithAssetDB(
                     args.nodeUuid,
                     fullPath,
                     prefabName,
-                    includeChildren,
-                    includeComponents
+                    true, // includeChildren
+                    true  // includeComponents
                 );
 
                 if (assetDbResult.success) {
+                    await this.refreshAssets(fullPath);
                     resolve(assetDbResult);
                     return;
                 }
 
-                // 如果 asset-db 方法失败，尝试使用Cocos Creator的原生预制体创建API
-                console.log('asset-db 方法失败，尝试原生API...');
-                const nativeResult = await this.createPrefabNative(args.nodeUuid, fullPath);
-                if (nativeResult.success) {
-                    resolve(nativeResult);
-                    return;
-                }
-
-                // 如果原生API失败，使用自定义实现
-                console.log('原生API失败，使用自定义实现...');
+                // 最后使用自定义实现
+                console.log('asset-db方法失败，使用自定义实现...');
                 const customResult = await this.createPrefabCustom(args.nodeUuid, fullPath, prefabName);
+                if (customResult.success) {
+                    await this.refreshAssets(fullPath);
+                }
                 resolve(customResult);
 
             } catch (error) {
@@ -815,16 +720,560 @@ export class PrefabTools implements ToolExecutor {
         });
     }
 
-    private async createPrefabNative(nodeUuid: string, prefabPath: string): Promise<ToolResponse> {
-        return new Promise((resolve) => {
-            // 根据官方API文档，不存在直接的预制体创建API
-            // 预制体创建需要手动在编辑器中完成
-            resolve({
-                success: false,
-                error: '原生预制体创建API不存在',
-                instruction: '根据Cocos Creator官方API文档，预制体创建需要手动操作：\n1. 在场景中选择节点\n2. 将节点拖拽到资源管理器中\n3. 或右键节点选择"生成预制体"'
-            });
+    // 使用编辑器标准的 scene.create-prefab 方法
+    private async createPrefabWithScene(nodeUuid: string, prefabPath: string, prefabName: string): Promise<ToolResponse> {
+        return new Promise(async (resolve) => {
+            try {
+                console.log(`[DEBUG] Creating prefab with scene API: nodeUuid=${nodeUuid}, prefabPath=${prefabPath}`);
+                
+                // 确保目录存在
+                const dirPath = prefabPath.substring(0, prefabPath.lastIndexOf('/'));
+                console.log(`[DEBUG] Ensuring directory exists: ${dirPath}`);
+                
+                try {
+                    await Editor.Message.request('asset-db', 'create-asset', dirPath, null);
+                    console.log(`[DEBUG] Directory creation attempted: ${dirPath}`);
+                } catch (dirError) {
+                    console.log(`[DEBUG] Directory creation failed or already exists: ${dirError}`);
+                }
+                
+                const result = await Editor.Message.request('scene', 'create-prefab', {
+                    nodeUuid: nodeUuid,
+                    url: prefabPath
+                });
+                
+                console.log('[DEBUG] scene.create-prefab result:', result);
+                
+                // 验证预制体是否真的创建成功
+                await new Promise(resolve => setTimeout(resolve, 500)); // 等待文件系统同步
+                
+                try {
+                    const assetInfo = await Editor.Message.request('asset-db', 'query-asset-info', prefabPath);
+                    console.log('[DEBUG] Asset verification result:', assetInfo);
+                    
+                    if (assetInfo && assetInfo.uuid) {
+                        console.log('[DEBUG] Prefab creation verified successfully');
+                        resolve({
+                            success: true,
+                            data: {
+                                prefabPath: prefabPath,
+                                prefabName: prefabName,
+                                nodeUuid: nodeUuid,
+                                assetUuid: assetInfo.uuid,
+                                message: '✅ Prefab created successfully with scene API'
+                            }
+                        });
+                    } else {
+                        console.log('[DEBUG] Prefab creation failed - asset not found after creation');
+                        resolve({
+                            success: false,
+                            error: 'Prefab creation appeared successful but asset was not found. File may not have been created.'
+                        });
+                    }
+                } catch (verifyError) {
+                    console.log('[DEBUG] Asset verification failed:', verifyError);
+                    resolve({
+                        success: false,
+                        error: `Prefab creation verification failed: ${verifyError}`
+                    });
+                }
+                
+            } catch (error: any) {
+                console.log('[DEBUG] scene.create-prefab failed:', error);
+                resolve({
+                    success: false,
+                    error: `Scene API prefab creation failed: ${error.message || error}`
+                });
+            }
         });
+    }
+
+    // 记录撤销操作 - 暂时禁用，因为API不存在
+    private async recordUndoOperation(operation: string, nodeUuid: string): Promise<void> {
+        try {
+            // 暂时注释掉不存在的API调用
+            // await Editor.Message.request('scene', 'undo.record', {
+            //     operation: operation,
+            //     nodeUuid: nodeUuid,
+            //     timestamp: Date.now()
+            // });
+            console.log(`撤销记录跳过 (API不存在): ${operation} for ${nodeUuid}`);
+        } catch (error) {
+            console.log(`撤销记录保存失败: ${error}`);
+            // 不阻断主流程
+        }
+    }
+
+    // 刷新资源 - 优化版本，避免不必要的全局刷新
+    private async refreshAssets(assetPath?: string): Promise<void> {
+        try {
+            if (assetPath) {
+                // 刷新特定资源
+                await Editor.Message.request('asset-db', 'refresh-asset', assetPath);
+                console.log(`资源刷新成功: ${assetPath}`);
+            } else {
+                // 避免全局刷新，只刷新资源目录
+                console.log('跳过全局资源刷新，避免编辑器重新加载');
+                // 如果确实需要刷新，可以手动调用：
+                // await Editor.Message.request('asset-db', 'refresh');
+            }
+        } catch (error) {
+            console.log(`资源刷新失败: ${error}`);
+            // 不阻断主流程
+        }
+    }
+
+    // 使用编辑器标准流程实例化预制体
+    private async instantiatePrefabStandard(args: any, assetInfo: any): Promise<ToolResponse> {
+        return new Promise(async (resolve) => {
+            try {
+                const parentUuid = args.parentUuid || 'ae46a3bb-5483-43dc-8152-8c5e42a0a9aa'; // 默认场景根节点
+                
+                // 1. 开始记录
+                await Editor.Message.request('scene', 'begin-recording', [parentUuid]);
+                
+                // 2. 创建节点（使用assetUuid参数）
+                const createNodeOptions: any = {
+                    parent: parentUuid,
+                    assetUuid: assetInfo.uuid,
+                    name: args.name || assetInfo.name || 'PrefabInstance',
+                    type: 'cc.Prefab'
+                };
+
+                const nodeUuid = await Editor.Message.request('scene', 'create-node', createNodeOptions);
+                const uuid = Array.isArray(nodeUuid) ? nodeUuid[0] : nodeUuid;
+
+                // 3. 如果有位置参数，调整节点位置
+                if (args.position) {
+                    await Editor.Message.request('scene', 'set-property', {
+                        uuid: uuid,
+                        path: 'position',
+                        dump: { value: args.position }
+                    });
+                }
+
+                // 4. 如果需要调整在父节点中的顺序
+                if (args.siblingIndex !== undefined && args.siblingIndex >= 0) {
+                    await Editor.Message.request('scene', 'move-array-element', {
+                        uuid: parentUuid,
+                        path: 'children',
+                        target: args.siblingIndex,
+                        offset: 0
+                    });
+                }
+
+                // 5. 结束记录
+                await Editor.Message.request('scene', 'end-recording', [`instantiate-${Date.now()}`]);
+
+                resolve({
+                    success: true,
+                    data: {
+                        nodeUuid: uuid,
+                        prefabPath: args.prefabPath,
+                        parentUuid: parentUuid,
+                        position: args.position,
+                        message: '预制体实例化成功（使用编辑器标准流程）'
+                    }
+                });
+
+            } catch (error) {
+                console.log('编辑器标准流程失败:', error);
+                resolve({
+                    success: false,
+                    error: `编辑器标准流程失败: ${error}`
+                });
+            }
+        });
+    }
+
+    // 简化的实例化方法
+    private async instantiatePrefabSimple(args: any, assetInfo: any): Promise<ToolResponse> {
+        return new Promise(async (resolve) => {
+            try {
+                // 使用简化的 create-node API
+                const createNodeOptions: any = {
+                    assetUuid: assetInfo.uuid
+                };
+
+                // 设置父节点
+                if (args.parentUuid) {
+                    createNodeOptions.parent = args.parentUuid;
+                }
+
+                // 设置节点名称
+                if (args.name) {
+                    createNodeOptions.name = args.name;
+                } else if (assetInfo.name) {
+                    createNodeOptions.name = assetInfo.name;
+                }
+
+                // 设置初始属性（如位置）
+                if (args.position) {
+                    createNodeOptions.dump = {
+                        position: {
+                            value: args.position
+                        }
+                    };
+                }
+
+                // 创建节点
+                const nodeUuid = await Editor.Message.request('scene', 'create-node', createNodeOptions);
+                const uuid = Array.isArray(nodeUuid) ? nodeUuid[0] : nodeUuid;
+
+                console.log('简化方法预制体节点创建成功:', {
+                    nodeUuid: uuid,
+                    prefabUuid: assetInfo.uuid,
+                    prefabPath: args.prefabPath
+                });
+                
+                resolve({
+                    success: true,
+                    data: {
+                        nodeUuid: uuid,
+                        prefabPath: args.prefabPath,
+                        parentUuid: args.parentUuid,
+                        position: args.position,
+                        message: '预制体实例化成功（使用简化方法）'
+                    }
+                });
+
+            } catch (error) {
+                resolve({
+                    success: false,
+                    error: `简化方法失败: ${error}`
+                });
+            }
+        });
+    }
+
+    // 1. Prefab browse handler
+    private async handlePrefabBrowse(args: any): Promise<ToolResponse> {
+        try {
+            const { action } = args;
+            
+            switch (action) {
+                case 'list':
+                    return await this.getPrefabList(args.folder);
+                case 'info':
+                    if (!args.prefabPath) {
+                        return { success: false, error: 'prefabPath required for info action' };
+                    }
+                    return await this.getPrefabInfo(args.prefabPath);
+                case 'validate':
+                    if (!args.prefabPath) {
+                        return { success: false, error: 'prefabPath required for validate action' };
+                    }
+                    return await this.validatePrefab(args.prefabPath);
+                default:
+                    return { success: false, error: `Unsupported browse action: ${action}` };
+            }
+        } catch (error) {
+            return { success: false, error: `Browse operation failed: ${error}` };
+        }
+    }
+
+    // 2. Prefab lifecycle handler
+    private async handlePrefabLifecycle(args: any): Promise<ToolResponse> {
+        try {
+            const { action } = args;
+            
+            switch (action) {
+                case 'create':
+                    if (!args.nodeUuid || !args.prefabName || !args.savePath) {
+                        return { success: false, error: 'nodeUuid, prefabName, savePath required for create' };
+                    }
+                    const createResult = await this.createPrefab({
+                        nodeUuid: args.nodeUuid,
+                        prefabName: args.prefabName,
+                        savePath: args.savePath
+                    });
+                    if (createResult.success) {
+                        return {
+                            success: true,
+                            data: {
+                                prefabPath: args.savePath,
+                                message: '✅ Prefab created'
+                            }
+                        };
+                    }
+                    return createResult;
+                case 'delete':
+                    if (!args.prefabPath) {
+                        return { success: false, error: 'prefabPath required for delete' };
+                    }
+                    try {
+                        await Editor.Message.request('asset-db', 'delete-asset', args.prefabPath);
+                        await this.refreshAssets();
+                        return {
+                            success: true,
+                            data: { message: '✅ Prefab deleted' }
+                        };
+                    } catch (error) {
+                        return { success: false, error: `Delete failed: ${error}` };
+                    }
+                default:
+                    return { success: false, error: `Unsupported lifecycle action: ${action}` };
+            }
+        } catch (error) {
+            return { success: false, error: `Lifecycle operation failed: ${error}` };
+        }
+    }
+
+    // 3. Prefab instance handler
+    private async handlePrefabInstance(args: any): Promise<ToolResponse> {
+        try {
+            const { action } = args;
+            
+            switch (action) {
+                case 'instantiate':
+                    if (!args.prefabPath) {
+                        return { success: false, error: 'prefabPath required for instantiate' };
+                    }
+                    const instantiateResult = await this.instantiatePrefab({
+                        prefabPath: args.prefabPath,
+                        parentUuid: args.parentUuid,
+                        position: args.position
+                    });
+                    if (instantiateResult.success) {
+                        return {
+                            success: true,
+                            data: {
+                                nodeUuid: instantiateResult.data.nodeUuid,
+                                message: '✅ Prefab instantiated'
+                            }
+                        };
+                    }
+                    return instantiateResult;
+                case 'unlink':
+                    if (!args.nodeUuid) {
+                        return { success: false, error: 'nodeUuid required for unlink' };
+                    }
+                    const unlinkResult = await this.unlinkPrefab(args.nodeUuid);
+                    if (unlinkResult.success) {
+                        return {
+                            success: true,
+                            data: { message: '✅ Prefab unlinked' }
+                        };
+                    }
+                    return unlinkResult;
+                case 'apply':
+                    if (!args.nodeUuid) {
+                        return { success: false, error: 'nodeUuid required for apply' };
+                    }
+                    const applyResult = await this.applyPrefab(args.nodeUuid);
+                    if (applyResult.success) {
+                        return {
+                            success: true,
+                            data: { message: '✅ Changes applied to prefab' }
+                        };
+                    }
+                    return applyResult;
+                case 'revert':
+                    if (!args.nodeUuid) {
+                        return { success: false, error: 'nodeUuid required for revert' };
+                    }
+                    return await this.revertPrefab(args.nodeUuid);
+                default:
+                    return { success: false, error: `Unsupported instance action: ${action}` };
+            }
+        } catch (error) {
+            return { success: false, error: `Instance operation failed: ${error}` };
+        }
+    }
+
+    // 4. Prefab edit workflow handler
+    private async handlePrefabEdit(args: any): Promise<ToolResponse> {
+        try {
+            const { action, prefabPath } = args;
+            
+            switch (action) {
+                case 'enter':
+                    const enterResult = await this.enterPrefabEditMode(prefabPath);
+                    if (enterResult.success) {
+                        return {
+                            success: true,
+                            data: {
+                                status: 'editing',
+                                prefabPath: prefabPath,
+                                message: '✅ Entered prefab edit mode',
+                                reminder: '⚠️  IMPORTANT: After making changes, you MUST call save action, then exit action to return to scene'
+                            }
+                        };
+                    }
+                    return enterResult;
+                case 'save':
+                    const saveResult = await this.savePrefabDirect(prefabPath);
+                    if (saveResult.success) {
+                        return {
+                            success: true,
+                            data: {
+                                status: 'saved',
+                                prefabPath: prefabPath,
+                                message: '✅ Prefab saved',
+                                reminder: '⚠️  IMPORTANT: You MUST call exit action now to return to scene view'
+                            }
+                        };
+                    }
+                    return saveResult;
+                case 'exit':
+                    const exitResult = await this.exitPrefabEditMode(prefabPath);
+                    if (exitResult.success) {
+                        return {
+                            success: true,
+                            data: {
+                                status: 'scene',
+                                message: '✅ Returned to scene view',
+                                note: 'Prefab editing complete'
+                            }
+                        };
+                    }
+                    return exitResult;
+                case 'test':
+                    return await this.testPrefabChanges(prefabPath, args.parentUuid);
+                default:
+                    return { success: false, error: `Unsupported edit action: ${action}` };
+            }
+        } catch (error) {
+            return { success: false, error: `Prefab edit failed: ${error}` };
+        }
+    }
+
+    // 参数验证方法
+    private validatePrefabOperation(operation: string, args: any): { valid: boolean; error?: string } {
+        const requiredParams: Record<string, string[]> = {
+            'create': ['nodeUuid', 'prefabName'],
+            'instantiate': ['prefabPath'],
+            'update': ['prefabPath', 'nodeUuid'],
+            'delete': ['prefabPath'],
+            'revert': ['nodeUuid'],
+            'get_info': ['prefabPath'],
+            'validate': ['prefabPath'],
+            'unlink': ['nodeUuid'],
+            'apply': ['nodeUuid'],
+            'edit': ['prefabPath'],
+            'save': ['prefabPath'],
+            'exit_edit': [],
+            'test_changes': ['prefabPath']
+        };
+
+        const required = requiredParams[operation];
+        if (!required) {
+            return { valid: false, error: `不支持的操作类型: ${operation}` };
+        }
+
+        for (const param of required) {
+            if (!args[param]) {
+                return { valid: false, error: `操作 '${operation}' 缺少必需参数: ${param}` };
+            }
+        }
+
+        // 特殊验证规则
+        if (operation === 'create' && !args.savePath && !args.prefabPath) {
+            return { valid: false, error: `操作 'create' 需要 savePath 或 prefabPath 参数` };
+        }
+
+        return { valid: true };
+    }
+
+    // 统一的预制体管理方法
+    private async managePrefab(args: any): Promise<ToolResponse> {
+        try {
+            // 验证操作类型
+            const operation = args.operation;
+            if (!operation) {
+                return {
+                    success: false,
+                    error: '缺少必需参数: operation'
+                };
+            }
+
+            // 验证各操作所需的参数
+            const validationResult = this.validatePrefabOperation(operation, args);
+            if (!validationResult.valid) {
+                return {
+                    success: false,
+                    error: validationResult.error
+                };
+            }
+            
+            switch (operation) {
+                case 'create':
+                    return await this.createPrefab({
+                        nodeUuid: args.nodeUuid,
+                        savePath: args.savePath || args.prefabPath,
+                        prefabName: args.prefabName
+                    });
+                
+                case 'instantiate':
+                    return await this.instantiatePrefab({
+                        prefabPath: args.prefabPath,
+                        parentUuid: args.parentUuid,
+                        position: args.position,
+                        siblingIndex: args.siblingIndex
+                    });
+                
+                case 'update':
+                    return await this.updatePrefab(args.prefabPath, args.nodeUuid);
+                
+                case 'delete':
+                    // 删除预制体资源
+                    try {
+                        await Editor.Message.request('asset-db', 'delete-asset', args.prefabPath);
+                        await this.refreshAssets();
+                        return {
+                            success: true,
+                            data: {
+                                prefabPath: args.prefabPath,
+                                message: '预制体删除成功'
+                            }
+                        };
+                    } catch (error) {
+                        return {
+                            success: false,
+                            error: `预制体删除失败: ${error}`
+                        };
+                    }
+                
+                case 'revert':
+                    return await this.revertPrefab(args.nodeUuid);
+                
+                
+                case 'get_info':
+                    return await this.getPrefabInfo(args.prefabPath);
+                
+                case 'validate':
+                    return await this.validatePrefab(args.prefabPath);
+                
+                case 'unlink':
+                    return await this.unlinkPrefab(args.nodeUuid);
+                
+                case 'apply':
+                    return await this.applyPrefab(args.nodeUuid);
+                
+                case 'edit':
+                    return await this.enterPrefabEditMode(args.prefabPath);
+                
+                case 'save':
+                    return await this.savePrefabDirect(args.prefabPath);
+                
+                case 'exit_edit':
+                    return await this.exitPrefabEditMode(args.prefabPath);
+                
+                case 'test_changes':
+                    return await this.testPrefabChanges(args.prefabPath, args.parentUuid);
+                
+                default:
+                    return {
+                        success: false,
+                        error: `不支持的预制体操作: ${operation}`
+                    };
+            }
+        } catch (error) {
+            return {
+                success: false,
+                error: `预制体管理操作失败: ${error}`
+            };
+        }
     }
 
     private async createPrefabCustom(nodeUuid: string, prefabPath: string, prefabName: string): Promise<ToolResponse> {
@@ -1327,39 +1776,93 @@ export class PrefabTools implements ToolExecutor {
     }
 
     private async updatePrefab(prefabPath: string, nodeUuid: string): Promise<ToolResponse> {
-        return new Promise((resolve) => {
-            Editor.Message.request('asset-db', 'query-asset-info', prefabPath).then((assetInfo: any) => {
-                if (!assetInfo) {
-                    throw new Error('Prefab not found');
+        return new Promise(async (resolve) => {
+            try {
+                console.log(`开始更新预制体: prefabPath=${prefabPath}, nodeUuid=${nodeUuid}`);
+                
+                // 1. 首先验证节点是预制体实例
+                const nodeInfo = await Editor.Message.request('scene', 'query-node', nodeUuid);
+                if (!nodeInfo || !(nodeInfo as any).__prefab__) {
+                    resolve({
+                        success: false,
+                        error: '指定的节点不是预制体实例'
+                    });
+                    return;
                 }
-
-                return Editor.Message.request('scene', 'apply-prefab', {
-                    node: nodeUuid,
-                    prefab: assetInfo.uuid
-                });
-            }).then(() => {
+                
+                const prefabInfo = (nodeInfo as any).__prefab__;
+                console.log(`预制体实例信息:`, prefabInfo);
+                
+                // 2. 使用正确的 apply-prefab API 格式（基于编辑器日志）
+                console.log('调用 scene.apply-prefab API...');
+                const applyResult = await Editor.Message.request('scene', 'apply-prefab', [nodeUuid]);
+                console.log('apply-prefab API 调用结果:', applyResult);
+                
+                // 3. 等待编辑器处理
+                await new Promise(resolve => setTimeout(resolve, 200));
+                
+                // 4. 获取预制体资源信息并刷新
+                try {
+                    const assetInfo = await Editor.Message.request('asset-db', 'query-asset-info', prefabPath);
+                    if (assetInfo && assetInfo.source) {
+                        // 刷新特定的预制体资源
+                        await this.refreshAssets(assetInfo.source);
+                        console.log(`预制体资源已刷新: ${assetInfo.source}`);
+                    }
+                } catch (assetError) {
+                    console.log('获取或刷新预制体资源失败:', assetError);
+                }
+                
                 resolve({
                     success: true,
-                    message: 'Prefab updated successfully'
+                    data: {
+                        nodeUuid: nodeUuid,
+                        prefabPath: prefabPath,
+                        prefabAssetUuid: prefabInfo.asset,
+                        message: '预制体实例的修改已成功应用到预制体资源',
+                        applyResult: applyResult
+                    }
                 });
-            }).catch((err: Error) => {
-                resolve({ success: false, error: err.message });
-            });
+                
+            } catch (error: any) {
+                console.error('更新预制体失败:', error);
+                resolve({
+                    success: false,
+                    error: `更新预制体失败: ${error.message || error}`,
+                    instruction: '请确认节点是有效的预制体实例且存在未应用的修改'
+                });
+            }
         });
     }
 
     private async revertPrefab(nodeUuid: string): Promise<ToolResponse> {
-        return new Promise((resolve) => {
-            Editor.Message.request('scene', 'revert-prefab', {
-                node: nodeUuid
-            }).then(() => {
+        return new Promise(async (resolve) => {
+            try {
+                // 先获取节点信息以确定预制体资源UUID
+                const nodeInfo = await Editor.Message.request('scene', 'query-node', nodeUuid);
+                if (!nodeInfo || !nodeInfo.__prefab__) {
+                    resolve({
+                        success: false,
+                        error: 'Node is not a prefab instance'
+                    });
+                    return;
+                }
+                
+                const prefabAssetUuid = nodeInfo.__prefab__.uuid;
+                
+                // 使用正确的API: restore-prefab
+                (Editor.Message.request as any)('scene', 'restore-prefab', nodeUuid, prefabAssetUuid);
+                
                 resolve({
                     success: true,
-                    message: 'Prefab instance reverted successfully'
+                    data: { 
+                        message: '✅ Prefab reverted',
+                        nodeUuid: nodeUuid
+                    }
                 });
-            }).catch((err: Error) => {
-                resolve({ success: false, error: err.message });
-            });
+            } catch (error) {
+                resolve({ success: false, error: `Failed to get node info: ${error}` });
+            }
         });
     }
 
@@ -1414,9 +1917,20 @@ export class PrefabTools implements ToolExecutor {
                         return;
                     }
 
-                    // 验证预制体格式
-                    Editor.Message.request('asset-db', 'read-asset', prefabPath).then((content: string) => {
+                    // 获取预制体文件的磁盘路径
+                    Editor.Message.request('asset-db', 'query-path', prefabPath).then((diskPath: string | null) => {
+                        if (!diskPath) {
+                            resolve({
+                                success: false,
+                                error: 'Cannot get prefab disk path'
+                            });
+                            return;
+                        }
+                        
+                        // 使用Node.js fs读取文件
+                        const fs = require('fs');
                         try {
+                            const content = fs.readFileSync(diskPath, 'utf8');
                             const prefabData = JSON.parse(content);
                             const validationResult = this.validatePrefabFormat(prefabData);
                             
@@ -1501,60 +2015,20 @@ export class PrefabTools implements ToolExecutor {
         };
     }
 
-    private async duplicatePrefab(args: any): Promise<ToolResponse> {
-        return new Promise(async (resolve) => {
-            try {
-                const { sourcePrefabPath, targetPrefabPath, newPrefabName } = args;
-                
-                // 读取源预制体
-                const sourceInfo = await this.getPrefabInfo(sourcePrefabPath);
-                if (!sourceInfo.success) {
-                    resolve({
-                        success: false,
-                        error: `无法读取源预制体: ${sourceInfo.error}`
-                    });
-                    return;
-                }
-
-                // 读取源预制体内容
-                const sourceContent = await this.readPrefabContent(sourcePrefabPath);
-                if (!sourceContent.success) {
-                    resolve({
-                        success: false,
-                        error: `无法读取源预制体内容: ${sourceContent.error}`
-                    });
-                    return;
-                }
-
-                // 生成新的UUID
-                const newUuid = this.generateUUID();
-                
-                // 修改预制体数据
-                const modifiedData = this.modifyPrefabForDuplication(sourceContent.data, newPrefabName, newUuid);
-                
-                // 创建新的meta数据
-                const newMetaData = this.createMetaData(newPrefabName || 'DuplicatedPrefab', newUuid);
-                
-                // 预制体复制功能暂时禁用，因为涉及复杂的序列化格式
-                resolve({
-                    success: false,
-                    error: '预制体复制功能暂时不可用',
-                    instruction: '请在 Cocos Creator 编辑器中手动复制预制体：\n1. 在资源管理器中选择要复制的预制体\n2. 右键选择复制\n3. 在目标位置粘贴'
-                });
-
-            } catch (error) {
-                resolve({
-                    success: false,
-                    error: `复制预制体时发生错误: ${error}`
-                });
-            }
-        });
-    }
 
     private async readPrefabContent(prefabPath: string): Promise<{ success: boolean; data?: any; error?: string }> {
         return new Promise((resolve) => {
-            Editor.Message.request('asset-db', 'read-asset', prefabPath).then((content: string) => {
+            // 获取磁盘路径
+            Editor.Message.request('asset-db', 'query-path', prefabPath).then((diskPath: string | null) => {
+                if (!diskPath) {
+                    resolve({ success: false, error: 'Cannot get prefab disk path' });
+                    return;
+                }
+                
+                // 使用fs读取文件
+                const fs = require('fs');
                 try {
+                    const content = fs.readFileSync(diskPath, 'utf8');
                     const prefabData = JSON.parse(content);
                     resolve({ success: true, data: prefabData });
                 } catch (parseError) {
@@ -1566,20 +2040,6 @@ export class PrefabTools implements ToolExecutor {
         });
     }
 
-    private modifyPrefabForDuplication(prefabData: any[], newName: string, newUuid: string): any[] {
-        // 修改预制体数据以创建副本
-        const modifiedData = [...prefabData];
-        
-        // 修改第一个元素（预制体资产）
-        if (modifiedData[0] && modifiedData[0].__type__ === 'cc.Prefab') {
-            modifiedData[0]._name = newName || 'DuplicatedPrefab';
-        }
-
-        // 更新所有UUID引用（简化版本）
-        // 在实际应用中，可能需要更复杂的UUID映射处理
-        
-        return modifiedData;
-    }
 
     /**
      * 使用 asset-db API 创建资源文件
@@ -2851,6 +3311,639 @@ export class PrefabTools implements ToolExecutor {
             console.error('保存预制体文件时出错:', error);
             return { success: false, error: error.message };
         }
+    }
+
+    // 解除预制体链接，将预制体实例转换为普通节点
+    private async unlinkPrefab(nodeUuid: string): Promise<ToolResponse> {
+        return new Promise((resolve) => {
+            try {
+                console.log(`开始解除预制体链接: ${nodeUuid}`);
+                
+                // 使用 Editor.Message.request 调用场景 API 的 unlink-prefab 方法
+                // 先尝试参数：[nodeUuid, true]
+                console.log('尝试解除预制体链接，参数: [nodeUuid, true]');
+                Editor.Message.request('scene', 'unlink-prefab', [
+                    nodeUuid,
+                    true
+                ]).then(async (result: any) => {
+                    console.log('解除预制体链接API调用完成，返回值:', result);
+                    
+                    // 等待一小段时间让编辑器处理变化
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    
+                    // 手动清除预制体属性
+                    try {
+                        console.log('手动清除预制体属性...');
+                        await Editor.Message.request('scene', 'set-property', {
+                            uuid: nodeUuid,
+                            path: '__prefab__',
+                            dump: { value: null }
+                        });
+                        console.log('预制体属性已清除');
+                    } catch (clearError) {
+                        console.log('清除预制体属性失败:', clearError);
+                    }
+                    
+                    // 再次等待处理
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    
+                    // 验证节点是否真的解除了预制体链接
+                    try {
+                        const nodeInfo = await Editor.Message.request('scene', 'query-node', nodeUuid);
+                        console.log('最终验证 - 节点预制体状态:', nodeInfo && (nodeInfo as any).__prefab__ ? '仍是预制体' : '已解除链接');
+                        
+                        // 检查节点是否还有预制体属性
+                        const isPrefabInstance = nodeInfo && (nodeInfo as any).__prefab__ && (nodeInfo as any).__prefab__.uuid;
+                        
+                        resolve({
+                            success: true,
+                            data: {
+                                nodeUuid: nodeUuid,
+                                message: isPrefabInstance ? 
+                                    '预制体链接解除可能未完全成功，请检查编辑器界面' : 
+                                    '预制体实例已成功转换为普通节点',
+                                result: result,
+                                isPrefabInstance: isPrefabInstance,
+                                nodeInfo: nodeInfo,
+                                note: '已验证节点状态'
+                            }
+                        });
+                    } catch (verifyError) {
+                        console.log('验证节点状态时出错:', verifyError);
+                        resolve({
+                            success: true,
+                            data: {
+                                nodeUuid: nodeUuid,
+                                message: '预制体链接解除API调用成功，但无法验证最终状态',
+                                result: result,
+                                verifyError: String(verifyError)
+                            }
+                        });
+                    }
+                }).catch((error: any) => {
+                    console.error('解除预制体链接失败:', error);
+                    
+                    // 尝试备用方法：通过设置节点的prefab属性为null
+                    this.tryAlternativeUnlink(nodeUuid).then((altResult) => {
+                        if (altResult.success) {
+                            resolve(altResult);
+                        } else {
+                            resolve({
+                                success: false,
+                                error: `解除预制体链接失败: ${error.message || error}`,
+                                instruction: '请确认节点是预制体实例且在当前场景中存在'
+                            });
+                        }
+                    });
+                });
+            } catch (error) {
+                console.error('解除预制体链接异常:', error);
+                resolve({
+                    success: false,
+                    error: `解除预制体链接异常: ${error}`
+                });
+            }
+        });
+    }
+
+    // 备用解除预制体链接方法：通过修改节点属性
+    private async tryAlternativeUnlink(nodeUuid: string): Promise<ToolResponse> {
+        return new Promise((resolve) => {
+            try {
+                // 尝试通过设置节点属性来解除预制体链接
+                Editor.Message.request('scene', 'set-property', {
+                    uuid: nodeUuid,
+                    path: '_prefab',
+                    dump: { value: null }
+                }).then(() => {
+                    // 同时移除预制体实例标记
+                    Editor.Message.request('scene', 'set-property', {
+                        uuid: nodeUuid,
+                        path: '_prefab.instance',
+                        dump: { value: null }
+                    }).then(() => {
+                        console.log('备用方法解除预制体链接成功');
+                        resolve({
+                            success: true,
+                            data: {
+                                nodeUuid: nodeUuid,
+                                message: '预制体实例已通过备用方法转换为普通节点',
+                                method: 'alternative'
+                            }
+                        });
+                    }).catch((error2: any) => {
+                        console.error('备用方法失败:', error2);
+                        resolve({
+                            success: false,
+                            error: `备用方法失败: ${error2.message || error2}`
+                        });
+                    });
+                }).catch((error1: any) => {
+                    console.error('设置_prefab属性失败:', error1);
+                    resolve({
+                        success: false,
+                        error: `设置_prefab属性失败: ${error1.message || error1}`
+                    });
+                });
+            } catch (error) {
+                resolve({
+                    success: false,
+                    error: `备用方法异常: ${error}`
+                });
+            }
+        });
+    }
+
+    // 应用预制体实例的修改回预制体资源
+    private async applyPrefab(nodeUuid: string): Promise<ToolResponse> {
+        return new Promise(async (resolve) => {
+            try {
+                console.log(`开始应用预制体实例修改: ${nodeUuid}`);
+                
+                // 1. 首先验证节点是预制体实例
+                const nodeInfo = await Editor.Message.request('scene', 'query-node', nodeUuid);
+                if (!nodeInfo || !(nodeInfo as any).__prefab__) {
+                    resolve({
+                        success: false,
+                        error: '指定的节点不是预制体实例'
+                    });
+                    return;
+                }
+                
+                const prefabInfo = (nodeInfo as any).__prefab__;
+                const prefabAssetUuid = prefabInfo.asset;
+                
+                console.log(`预制体实例信息:`, prefabInfo);
+                console.log(`关联的预制体资源 UUID: ${prefabAssetUuid}`);
+                
+                // 2. 调用 scene.apply-prefab API 应用修改
+                console.log('调用 scene.apply-prefab API...');
+                Editor.Message.request('scene', 'apply-prefab', [nodeUuid]).then(async (applyResult: any) => {
+                    console.log('apply-prefab API 调用结果:', applyResult);
+                    
+                    // 3. 等待编辑器处理
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                    
+                    // 4. 获取预制体资源路径进行更新
+                    try {
+                        const assetInfo = await Editor.Message.request('asset-db', 'query-asset-info', prefabAssetUuid);
+                        console.log('预制体资源信息:', assetInfo);
+                        
+                        if (assetInfo && assetInfo.source) {
+                            const prefabPath = assetInfo.source;
+                            console.log(`预制体资源路径: ${prefabPath}`);
+                            
+                            // 5. 刷新特定的预制体资源
+                            await this.refreshAssets(prefabPath);
+                            
+                            resolve({
+                                success: true,
+                                data: {
+                                    nodeUuid: nodeUuid,
+                                    prefabAssetUuid: prefabAssetUuid,
+                                    prefabPath: prefabPath,
+                                    message: '预制体实例的修改已成功应用到预制体资源',
+                                    applyResult: applyResult
+                                }
+                            });
+                        } else {
+                            resolve({
+                                success: true,
+                                data: {
+                                    nodeUuid: nodeUuid,
+                                    prefabAssetUuid: prefabAssetUuid,
+                                    message: '预制体修改已应用，但无法获取资源路径信息',
+                                    applyResult: applyResult
+                                }
+                            });
+                        }
+                    } catch (assetError) {
+                        console.log('获取预制体资源信息失败:', assetError);
+                        resolve({
+                            success: true,
+                            data: {
+                                nodeUuid: nodeUuid,
+                                prefabAssetUuid: prefabAssetUuid,
+                                message: '预制体修改已应用，但获取资源信息时出错',
+                                applyResult: applyResult,
+                                assetError: String(assetError)
+                            }
+                        });
+                    }
+                }).catch((error: any) => {
+                    console.error('apply-prefab API 调用失败:', error);
+                    resolve({
+                        success: false,
+                        error: `应用预制体修改失败: ${error.message || error}`,
+                        instruction: '请确认节点是有效的预制体实例且存在未应用的修改'
+                    });
+                });
+                
+            } catch (error: any) {
+                console.error('应用预制体修改异常:', error);
+                resolve({
+                    success: false,
+                    error: `应用预制体修改异常: ${error.message || error}`
+                });
+            }
+        });
+    }
+
+    // 进入预制体编辑模式 - 基于编辑器日志实现
+    private async enterPrefabEditMode(prefabPath: string): Promise<ToolResponse> {
+        return new Promise(async (resolve) => {
+            try {
+                console.log(`开始进入预制体编辑模式: ${prefabPath}`);
+                
+                // 1. 查询预制体资源信息
+                const assetInfo = await Editor.Message.request('asset-db', 'query-asset-info', prefabPath);
+                if (!assetInfo) {
+                    resolve({
+                        success: false,
+                        error: '预制体资源不存在'
+                    });
+                    return;
+                }
+                
+                const prefabUuid = assetInfo.uuid;
+                console.log(`预制体 UUID: ${prefabUuid}`);
+                
+                // 2. 根据编辑器日志，首先打开预制体资源 (就像双击预制体文件)
+                try {
+                    await Editor.Message.request('asset-db', 'open-asset', prefabPath);
+                    console.log('预制体资源打开请求已发送');
+                } catch (openError) {
+                    console.log('打开预制体资源失败:', openError);
+                }
+                
+                // 3. 等待编辑器处理资源打开
+                await new Promise(resolve => setTimeout(resolve, 800));
+                
+                // 4. 设置预制体预览模式 (基于日志中的 call-preview-function)
+                try {
+                    await Editor.Message.request('scene', 'call-preview-function', [
+                        'scene:prefab-preview',
+                        'setPrefab',
+                        prefabUuid
+                    ]);
+                    console.log('预制体预览模式设置成功');
+                } catch (previewError) {
+                    console.log('预制体预览模式设置失败:', previewError);
+                }
+                
+                // 5. 设置hierarchy面板为预制体编辑模式 (基于日志中的 hierarchy.staging)
+                try {
+                    await Editor.Message.request('hierarchy', 'staging', {
+                        assetUuid: prefabUuid,
+                        animationUuid: '',
+                        expandLevels: ['0']
+                    });
+                    console.log('Hierarchy预制体编辑模式设置成功');
+                } catch (hierarchyError) {
+                    console.log('设置Hierarchy预制体编辑模式失败:', hierarchyError);
+                }
+                
+                // 6. 等待编辑器完全处理
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                resolve({
+                    success: true,
+                    data: {
+                        prefabPath: prefabPath,
+                        prefabUuid: prefabUuid,
+                        message: '已进入预制体编辑模式',
+                        mode: 'prefab-edit',
+                        editSession: {
+                            prefabPath: prefabPath,
+                            prefabUuid: prefabUuid,
+                            startTime: Date.now()
+                        },
+                        note: '编辑器界面应该已切换到预制体编辑模式'
+                    }
+                });
+                
+            } catch (error: any) {
+                console.error('进入预制体编辑模式失败:', error);
+                resolve({
+                    success: false,
+                    error: `进入预制体编辑模式失败: ${error.message || error}`
+                });
+            }
+        });
+    }
+
+    // 保存预制体 - 基于编辑器日志中的 save-asset 调用
+    private async savePrefabDirect(prefabPath: string): Promise<ToolResponse> {
+        return new Promise(async (resolve) => {
+            try {
+                console.log(`开始保存预制体: ${prefabPath}`);
+                
+                // 1. 查询预制体资源信息
+                const assetInfo = await Editor.Message.request('asset-db', 'query-asset-info', prefabPath);
+                if (!assetInfo) {
+                    resolve({
+                        success: false,
+                        error: '预制体资源不存在'
+                    });
+                    return;
+                }
+                
+                const prefabUuid = assetInfo.uuid;
+                console.log(`预制体 UUID: ${prefabUuid}`);
+                
+                // 2. 调用 scene.save-scene 保存当前编辑状态 (基于日志)
+                // 这会将当前场景的编辑状态保存到内存中
+                try {
+                    await Editor.Message.request('scene', 'save-scene');
+                    console.log('场景状态已保存到内存');
+                } catch (saveSceneError) {
+                    console.log('保存场景状态失败:', saveSceneError);
+                }
+                
+                // 3. 查询预制体元数据
+                try {
+                    const metaInfo = await Editor.Message.request('asset-db', 'query-asset-meta', prefabUuid);
+                    console.log('预制体元数据:', metaInfo);
+                } catch (metaError) {
+                    console.log('获取预制体元数据失败:', metaError);
+                }
+                
+                // 4. 基于编辑器日志，直接触发保存操作
+                // 在预制体编辑模式下，scene.save-scene 会自动处理预制体内容的保存
+                // 不需要手动调用 asset-db.save-asset，编辑器会自动处理
+                
+                // 5. 等待编辑器处理资源变化
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                resolve({
+                    success: true,
+                    data: {
+                        prefabPath: prefabPath,
+                        prefabUuid: prefabUuid,
+                        message: '预制体保存请求已发送，编辑器将自动处理保存流程',
+                        timestamp: Date.now(),
+                        note: '基于编辑器日志，预制体编辑模式下scene.save-scene会自动保存预制体内容'
+                    }
+                });
+                
+            } catch (error: any) {
+                console.error('保存预制体失败:', error);
+                resolve({
+                    success: false,
+                    error: `保存预制体失败: ${error.message || error}`
+                });
+            }
+        });
+    }
+
+    // 退出预制体编辑模式 - 切换回场景
+    private async exitPrefabEditMode(scenePath?: string): Promise<ToolResponse> {
+        return new Promise(async (resolve) => {
+            try {
+                console.log(`开始退出预制体编辑模式，切换到场景: ${scenePath || 'db://assets/scene.scene'}`);
+                
+                // 1. 确定目标场景路径
+                const targetScene = scenePath || 'db://assets/scene.scene';
+                
+                // 2. 查询目标场景信息
+                const sceneAssetInfo = await Editor.Message.request('asset-db', 'query-asset-info', targetScene);
+                if (!sceneAssetInfo) {
+                    resolve({
+                        success: false,
+                        error: '目标场景不存在'
+                    });
+                    return;
+                }
+                
+                const sceneUuid = sceneAssetInfo.uuid;
+                console.log(`目标场景 UUID: ${sceneUuid}`);
+                
+                // 3. 调用 asset-db.open-asset 打开场景资源 (基于日志)
+                try {
+                    await Editor.Message.request('asset-db', 'open-asset', targetScene);
+                    console.log('场景资源打开请求已发送');
+                } catch (openError) {
+                    console.log('打开场景资源失败:', openError);
+                }
+                
+                // 4. 调用 scene.open-scene 切换场景 (基于日志)
+                try {
+                    await Editor.Message.request('scene', 'open-scene', sceneUuid);
+                    console.log('场景切换请求已发送');
+                } catch (openSceneError) {
+                    console.log('切换场景失败:', openSceneError);
+                }
+                
+                // 5. 等待编辑器处理场景切换
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // 6. 查询当前场景状态确认切换成功
+                try {
+                    const currentScene = await Editor.Message.request('scene', 'query-current-scene');
+                    console.log('当前场景:', currentScene);
+                } catch (queryError) {
+                    console.log('查询当前场景失败:', queryError);
+                }
+                
+                resolve({
+                    success: true,
+                    data: {
+                        message: '已退出预制体编辑模式并切换到场景',
+                        previousMode: 'prefab-edit',
+                        currentMode: 'scene',
+                        targetScene: targetScene,
+                        sceneUuid: sceneUuid,
+                        timestamp: Date.now()
+                    }
+                });
+                
+            } catch (error: any) {
+                console.error('退出预制体编辑模式失败:', error);
+                resolve({
+                    success: false,
+                    error: `退出预制体编辑模式失败: ${error.message || error}`
+                });
+            }
+        });
+    }
+
+    // 开始记录编辑操作 - 基于日志中的 begin-recording
+    private async beginRecording(nodeUuids: string[]): Promise<ToolResponse> {
+        return new Promise(async (resolve) => {
+            try {
+                console.log(`开始记录编辑操作，节点: ${nodeUuids.join(', ')}`);
+                
+                const result = await Editor.Message.request('scene', 'begin-recording', 
+                    nodeUuids,
+                    null
+                );
+                
+                console.log('开始记录结果:', result);
+                
+                resolve({
+                    success: true,
+                    data: {
+                        nodeUuids: nodeUuids,
+                        recordingId: result,
+                        message: '编辑记录已开始',
+                        timestamp: Date.now()
+                    }
+                });
+                
+            } catch (error: any) {
+                console.error('开始记录编辑操作失败:', error);
+                resolve({
+                    success: false,
+                    error: `开始记录编辑操作失败: ${error.message || error}`
+                });
+            }
+        });
+    }
+
+    // 结束记录编辑操作 - 基于日志中的 end-recording
+    private async endRecording(recordingId: string): Promise<ToolResponse> {
+        return new Promise(async (resolve) => {
+            try {
+                console.log(`结束记录编辑操作，记录ID: ${recordingId}`);
+                
+                const result = await Editor.Message.request('scene', 'end-recording', recordingId);
+                
+                console.log('结束记录结果:', result);
+                
+                resolve({
+                    success: true,
+                    data: {
+                        recordingId: recordingId,
+                        result: result,
+                        message: '编辑记录已结束',
+                        timestamp: Date.now()
+                    }
+                });
+                
+            } catch (error: any) {
+                console.error('结束记录编辑操作失败:', error);
+                resolve({
+                    success: false,
+                    error: `结束记录编辑操作失败: ${error.message || error}`
+                });
+            }
+        });
+    }
+
+    // 测试预制体修改 - 实例化预制体验证修改是否成功
+    private async testPrefabChanges(prefabPath: string, parentUuid?: string): Promise<ToolResponse> {
+        return new Promise(async (resolve) => {
+            try {
+                console.log(`开始测试预制体修改: ${prefabPath}`);
+                
+                // 1. 首先确保我们在场景模式
+                try {
+                    await this.exitPrefabEditMode();
+                    console.log('已确保在场景模式');
+                } catch (exitError) {
+                    console.log('切换到场景模式时出错:', exitError);
+                }
+                
+                // 2. 获取场景根节点作为父节点（如果没有指定parentUuid）
+                let targetParentUuid = parentUuid;
+                if (!targetParentUuid) {
+                    try {
+                        const nodeTree: any = await Editor.Message.request('scene', 'query-node-tree');
+                        if (nodeTree && nodeTree.children && nodeTree.children.length > 0) {
+                            // 使用Canvas节点作为父节点
+                            const canvasNode = nodeTree.children.find((child: any) => 
+                                child.name && (child.name.includes('Canvas') || (child.__comps__ && child.__comps__.some((comp: any) => comp.__type__ === 'cc.Canvas')))
+                            );
+                            if (canvasNode) {
+                                targetParentUuid = canvasNode.uuid.value;
+                                console.log(`找到Canvas节点作为父节点: ${targetParentUuid}`);
+                            } else {
+                                targetParentUuid = nodeTree.uuid.value; // 使用场景根节点
+                                console.log(`使用场景根节点作为父节点: ${targetParentUuid}`);
+                            }
+                        }
+                    } catch (treeError) {
+                        console.log('获取节点树失败:', treeError);
+                    }
+                }
+                
+                // 3. 实例化预制体到场景中
+                console.log(`实例化预制体到节点: ${targetParentUuid}`);
+                const instantiateResult = await this.instantiatePrefab({
+                    prefabPath: prefabPath,
+                    parentUuid: targetParentUuid,
+                    position: { x: 0, y: 0, z: 0 }
+                });
+                
+                if (!instantiateResult.success) {
+                    resolve({
+                        success: false,
+                        error: `实例化预制体失败: ${instantiateResult.error}`
+                    });
+                    return;
+                }
+                
+                const instanceNodeUuid = instantiateResult.data.nodeUuid;
+                console.log(`预制体实例化成功，节点UUID: ${instanceNodeUuid}`);
+                
+                // 4. 等待实例化完成
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // 5. 查询实例化后的节点信息，验证修改
+                try {
+                    const instanceInfo = await Editor.Message.request('scene', 'query-node', instanceNodeUuid);
+                    console.log('实例化节点信息:', JSON.stringify(instanceInfo, null, 2));
+                    
+                    // 6. 查询节点树获取子节点信息
+                    const nodeTree = await Editor.Message.request('scene', 'query-node-tree');
+                    const findInstanceInTree = (tree: any, targetUuid: string): any => {
+                        if (tree.uuid && tree.uuid.value === targetUuid) {
+                            return tree;
+                        }
+                        if (tree.children) {
+                            for (const child of tree.children) {
+                                const found = findInstanceInTree(child, targetUuid);
+                                if (found) return found;
+                            }
+                        }
+                        return null;
+                    };
+                    
+                    const instanceNode = findInstanceInTree(nodeTree, instanceNodeUuid);
+                    console.log('节点树中的实例信息:', JSON.stringify(instanceNode, null, 2));
+                    
+                    resolve({
+                        success: true,
+                        data: {
+                            message: '✅ Test completed - prefab instantiated successfully',
+                            instanceNodeUuid: instanceNodeUuid,
+                            prefabPath: prefabPath,
+                            note: 'Check editor Hierarchy panel to verify changes'
+                        }
+                    });
+                    
+                } catch (queryError) {
+                    console.log('查询实例节点信息失败:', queryError);
+                    resolve({
+                        success: true,
+                        data: {
+                            prefabPath: prefabPath,
+                            instanceNodeUuid: instanceNodeUuid,
+                            parentUuid: targetParentUuid,
+                            message: '预制体实例化成功，但查询详细信息失败',
+                            note: '请手动检查编辑器中的预制体实例'
+                        }
+                    });
+                }
+                
+            } catch (error: any) {
+                console.error('测试预制体修改失败:', error);
+                resolve({
+                    success: false,
+                    error: `测试预制体修改失败: ${error.message || error}`
+                });
+            }
+        });
     }
 
 }

@@ -1,1527 +1,864 @@
-# Cocos Creator MCP 服务器功能指导文档
+# Cocos Creator MCP 服务器功能指南（v1.5.4）
 
-## 概述
+## 概览
 
-Cocos Creator MCP 服务器是一个全面的 Model Context Protocol (MCP) 服务器插件，专为 Cocos Creator 3.8+ 设计，通过标准化协议使 AI 助手能够与 Cocos Creator 编辑器进行交互。
+- 工具总数：**50**
+- 分类分布：**5/8/4/4/2/3/3/2/2/5/4/5/3**
+- 传输协议：`Streamable HTTP (MCP 2025-03-26)`
+- 命名规范：使用 `分类_工具名`（例如 `node_node_query`）
+- 说明：`sceneAdvanced` 已完全移除，不在暴露面。
 
-本文档详细介绍了所有可用的 MCP 工具及其使用方法。
+## 工具分类索引
 
-## 工具分类
+1. 场景工具（5）
+2. 节点工具（8）
+3. 组件工具（4）
+4. 预制体工具（4）
+5. 项目工具（2）
+6. 调试工具（3）
+7. 偏好设置工具（3）
+8. 服务器工具（2）
+9. 广播工具（2）
+10. 场景视图工具（5）
+11. 参考图像工具（4）
+12. 资源高级工具（5）
+13. 验证工具（3）
 
-MCP 服务器提供了 **159 个工具**，按功能分为 13 个主要类别：
+## 1. 场景工具（5）
 
-1. [场景操作工具 (Scene Tools)](#1-场景操作工具-scene-tools)
-2. [节点操作工具 (Node Tools)](#2-节点操作工具-node-tools)
-3. [组件管理工具 (Component Tools)](#3-组件管理工具-component-tools)
-4. [预制体操作工具 (Prefab Tools)](#4-预制体操作工具-prefab-tools)
-5. [项目控制工具 (Project Tools)](#5-项目控制工具-project-tools)
-6. [调试工具 (Debug Tools)](#6-调试工具-debug-tools)
-7. [偏好设置工具 (Preferences Tools)](#7-偏好设置工具-preferences-tools)
-8. [服务器工具 (Server Tools)](#8-服务器工具-server-tools)
-9. [广播工具 (Broadcast Tools)](#9-广播工具-broadcast-tools)
-10. [高级资源工具 (Asset Advanced Tools)](#10-高级资源工具-asset-advanced-tools)
-11. [参考图像工具 (Reference Image Tools)](#11-参考图像工具-reference-image-tools)
-12. [高级场景工具 (Scene Advanced Tools)](#12-高级场景工具-scene-advanced-tools)
-13. [场景视图工具 (Scene View Tools)](#13-场景视图工具-scene-view-tools)
+### 1.1 `scene_scene_management`
 
----
+- 用途：SCENE MANAGEMENT
+- action：`get_current`、`get_list`、`open`、`save`、`create`、`save_as`、`close`
+- 关键参数：`action`、`path`、`scenePath`
+- 最小调用示例：
 
-## 1. 场景操作工具 (Scene Tools)
-
-### 1.1 scene_get_current_scene
-获取当前场景信息
-
-**参数**: 无
-
-**返回**: 当前场景的名称、UUID、类型、激活状态和节点数量
-
-**示例**:
 ```json
 {
-  "tool": "scene_get_current_scene",
+  "tool": "scene_scene_management",
+  "arguments": {
+    "action": "get_current"
+  }
+}
+```
+
+### 1.2 `scene_scene_hierarchy`
+
+- 用途：SCENE HIERARCHY
+- action：`(none)`
+- 关键参数：`(none)`
+- 最小调用示例：
+
+```json
+{
+  "tool": "scene_scene_hierarchy",
   "arguments": {}
 }
 ```
 
-### 1.2 scene_get_scene_list
-获取项目中所有场景列表
+### 1.3 `scene_scene_execution_control`
 
-**参数**: 无
+- 用途：EXECUTION CONTROL
+- action：`execute_component_method`、`execute_scene_script`、`restore_prefab`
+- 关键参数：`action`、`uuid`、`nodeUuid`
+- 最小调用示例：
 
-**返回**: 项目中所有场景的列表，包括名称、路径和UUID
-
-**示例**:
 ```json
 {
-  "tool": "scene_get_scene_list",
-  "arguments": {}
-}
-```
-
-### 1.3 scene_open_scene
-通过路径打开场景
-
-**参数**:
-- `scenePath` (string, 必需): 场景文件路径
-
-**示例**:
-```json
-{
-  "tool": "scene_open_scene",
+  "tool": "scene_scene_execution_control",
   "arguments": {
-    "scenePath": "db://assets/scenes/GameScene.scene"
+    "action": "execute_component_method"
   }
 }
 ```
 
-### 1.4 scene_save_scene
-保存当前场景
+### 1.4 `scene_scene_state_management`
 
-**参数**: 无
+- 用途：STATE MANAGEMENT
+- action：`create_snapshot`、`abort_snapshot`、`begin_undo`、`end_undo`、`cancel_undo`、`soft_reload`
+- 关键参数：`action`、`nodeUuid`
+- 最小调用示例：
 
-**示例**:
 ```json
 {
-  "tool": "scene_save_scene",
-  "arguments": {}
-}
-```
-
-### 1.5 scene_create_scene
-创建新场景资源
-
-**参数**:
-- `sceneName` (string, 必需): 新场景的名称
-- `savePath` (string, 必需): 保存场景的路径
-
-**示例**:
-```json
-{
-  "tool": "scene_create_scene",
+  "tool": "scene_scene_state_management",
   "arguments": {
-    "sceneName": "NewLevel",
-    "savePath": "db://assets/scenes/NewLevel.scene"
+    "action": "create_snapshot"
   }
 }
 ```
 
-### 1.6 scene_save_scene_as
-将场景另存为新文件
+### 1.5 `scene_scene_query_system`
 
-**参数**:
-- `path` (string, 必需): 保存场景的路径
+- 用途：QUERY SYSTEM
+- action：`check_ready`、`check_dirty`、`list_classes`、`list_components`、`check_script`、`find_nodes_by_asset`
+- 关键参数：`action`
+- 最小调用示例：
 
-**示例**:
 ```json
 {
-  "tool": "scene_save_scene_as",
+  "tool": "scene_scene_query_system",
   "arguments": {
-    "path": "db://assets/scenes/GameScene_Copy.scene"
+    "action": "check_ready"
   }
 }
 ```
 
-### 1.7 scene_close_scene
-关闭当前场景
+## 2. 节点工具（8）
 
-**参数**: 无
+### 2.1 `node_node_query`
 
-**示例**:
+- 用途：NODE SEARCH & INFORMATION
+- action：`info`、`find`、`find_by_name`、`list_all`、`detect_type`、`tree`
+- 关键参数：`action`、`uuid`
+- 最小调用示例：
+
 ```json
 {
-  "tool": "scene_close_scene",
-  "arguments": {}
-}
-```
-
-### 1.8 scene_get_scene_hierarchy
-获取当前场景的完整层级结构
-
-**参数**:
-- `includeComponents` (boolean, 可选): 是否包含组件信息，默认为 false
-
-**示例**:
-```json
-{
-  "tool": "scene_get_scene_hierarchy",
+  "tool": "node_node_query",
   "arguments": {
-    "includeComponents": true
+    "action": "info"
   }
 }
 ```
 
----
+### 2.2 `node_node_lifecycle`
 
-## 2. 节点操作工具 (Node Tools)
+- 用途：NODE CREATION & DELETION
+- action：`create`、`delete`
+- 关键参数：`action`、`uuid`
+- 最小调用示例：
 
-### 2.1 node_create_node
-在场景中创建新节点
-
-**参数**:
-- `name` (string, 必需): 节点名称
-- `parentUuid` (string, **强烈建议**): 父节点UUID。**重要**：强烈建议始终提供此参数。使用 `get_current_scene` 或 `get_all_nodes` 查找父节点UUID。如果不提供，节点将在场景根节点创建。
-- `nodeType` (string, 可选): 节点类型，可选值：`Node`、`2DNode`、`3DNode`，默认为 `Node`
-- `siblingIndex` (number, 可选): 同级索引，-1 表示添加到末尾，默认为 -1
-
-**重要提示**: 为了确保节点创建在预期位置，请始终提供 `parentUuid` 参数。您可以通过以下方式获取父节点UUID：
-- 使用 `scene_get_current_scene` 获取场景根节点UUID
-- 使用 `node_get_all_nodes` 查看所有节点及其UUID
-- 使用 `node_find_node_by_name` 查找特定节点的UUID
-
-**示例**:
 ```json
 {
-  "tool": "node_create_node",
+  "tool": "node_node_lifecycle",
   "arguments": {
-    "name": "PlayerNode",
-    "nodeType": "2DNode",
-    "parentUuid": "parent-uuid-here"
+    "action": "create"
   }
 }
 ```
 
-### 2.2 node_get_node_info
-通过UUID获取节点信息
+### 2.3 `node_node_transform`
 
-**参数**:
-- `uuid` (string, 必需): 节点UUID
+- 用途：MODIFY NODE PROPERTIES
+- action：`(none)`
+- 关键参数：`uuid`
+- 最小调用示例：
 
-**示例**:
 ```json
 {
-  "tool": "node_get_node_info",
+  "tool": "node_node_transform",
   "arguments": {
-    "uuid": "node-uuid-here"
+    "uuid": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
   }
 }
 ```
 
-### 2.3 node_find_nodes
-按名称模式查找节点
+### 2.4 `node_node_hierarchy`
 
-**参数**:
-- `pattern` (string, 必需): 搜索的名称模式
-- `exactMatch` (boolean, 可选): 是否精确匹配，默认为 false
+- 用途：MOVE OR COPY NODES
+- action：`move`、`duplicate`
+- 关键参数：`action`、`uuid`、`nodeUuid`
+- 最小调用示例：
 
-**示例**:
 ```json
 {
-  "tool": "node_find_nodes",
+  "tool": "node_node_hierarchy",
   "arguments": {
-    "pattern": "Enemy",
-    "exactMatch": false
+    "action": "move"
   }
 }
 ```
 
-### 2.4 node_find_node_by_name
-通过精确名称查找第一个节点
+### 2.5 `node_node_clipboard`
 
-**参数**:
-- `name` (string, 必需): 要查找的节点名称
+- 用途：CLIPBOARD OPERATIONS
+- action：`copy`、`paste`、`cut`
+- 关键参数：`action`
+- 最小调用示例：
 
-**示例**:
 ```json
 {
-  "tool": "node_find_node_by_name",
+  "tool": "node_node_clipboard",
   "arguments": {
-    "name": "Player"
+    "action": "copy"
   }
 }
 ```
 
-### 2.5 node_get_all_nodes
-获取场景中所有节点及其UUID
+### 2.6 `node_node_property_management`
 
-**参数**: 无
+- 用途：PROPERTY MANAGEMENT
+- action：`reset_property`、`reset_transform`、`reset_component`
+- 关键参数：`action`、`uuid`、`path`
+- 最小调用示例：
 
-**示例**:
 ```json
 {
-  "tool": "node_get_all_nodes",
-  "arguments": {}
-}
-```
-
-### 2.6 node_set_node_property
-设置节点属性值
-
-**参数**:
-- `uuid` (string, 必需): 节点UUID
-- `property` (string, 必需): 属性名称（如 position、rotation、scale、active）
-- `value` (any, 必需): 属性值
-
-**示例**:
-```json
-{
-  "tool": "node_set_node_property",
+  "tool": "node_node_property_management",
   "arguments": {
-    "uuid": "node-uuid-here",
-    "property": "position",
-    "value": {"x": 100, "y": 200, "z": 0}
+    "action": "reset_property",
+    "uuid": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
   }
 }
 ```
 
-### 2.7 node_delete_node
-从场景中删除节点
+### 2.7 `node_node_array_management`
 
-**参数**:
-- `uuid` (string, 必需): 要删除的节点UUID
+- 用途：ARRAY MANAGEMENT
+- action：`move_element`、`remove_element`
+- 关键参数：`action`、`uuid`、`path`
+- 最小调用示例：
 
-**示例**:
 ```json
 {
-  "tool": "node_delete_node",
+  "tool": "node_node_array_management",
   "arguments": {
-    "uuid": "node-uuid-here"
+    "action": "move_element",
+    "uuid": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "path": "db://assets/example"
   }
 }
 ```
 
-### 2.8 node_move_node
-将节点移动到新的父节点
+### 2.8 `node_node_script_management`
 
-**参数**:
-- `nodeUuid` (string, 必需): 要移动的节点UUID
-- `newParentUuid` (string, 必需): 新父节点UUID
-- `siblingIndex` (number, 可选): 新父节点中的同级索引，默认为 -1
+- 用途：NODE SCRIPT MANAGEMENT
+- action：`attach`、`remove`
+- 关键参数：`action`、`nodeUuid`
+- 最小调用示例：
 
-**示例**:
 ```json
 {
-  "tool": "node_move_node",
+  "tool": "node_node_script_management",
   "arguments": {
-    "nodeUuid": "node-uuid-here",
-    "newParentUuid": "parent-uuid-here",
-    "siblingIndex": 0
+    "action": "attach",
+    "nodeUuid": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
   }
 }
 ```
 
-### 2.9 node_duplicate_node
-复制节点
+## 3. 组件工具（4）
 
-**参数**:
-- `uuid` (string, 必需): 要复制的节点UUID
-- `includeChildren` (boolean, 可选): 是否包含子节点，默认为 true
+### 3.1 `component_component_manage`
 
-**示例**:
+- 用途：COMPONENT MANAGEMENT
+- action：`add`、`remove`
+- 关键参数：`action`、`nodeUuid`、`componentType`
+- 最小调用示例：
+
 ```json
 {
-  "tool": "node_duplicate_node",
+  "tool": "component_component_manage",
   "arguments": {
-    "uuid": "node-uuid-here",
-    "includeChildren": true
+    "action": "add",
+    "nodeUuid": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "componentType": "example"
   }
 }
 ```
 
----
+### 3.2 `component_component_query`
 
-## 3. 组件管理工具 (Component Tools)
+- 用途：COMPONENT QUERY
+- action：`list`、`info`、`available_types`
+- 关键参数：`action`、`nodeUuid`、`category`
+- 最小调用示例：
 
-### 3.1 component_add_component
-向指定节点添加组件
-
-**参数**:
-- `nodeUuid` (string, **必需**): 目标节点UUID。**重要**：必须指定要添加组件的确切节点。使用 `get_all_nodes` 或 `find_node_by_name` 获取所需节点的UUID。
-- `componentType` (string, 必需): 组件类型（如 cc.Sprite、cc.Label、cc.Button）
-
-**重要提示**: 在添加组件之前，请确保：
-1. 先使用 `node_get_all_nodes` 或 `node_find_node_by_name` 找到目标节点的UUID
-2. 验证节点存在且UUID正确
-3. 选择合适的组件类型
-
-**示例**:
 ```json
 {
-  "tool": "component_add_component",
+  "tool": "component_component_query",
   "arguments": {
-    "nodeUuid": "node-uuid-here",
-    "componentType": "cc.Sprite"
+    "action": "list"
   }
 }
 ```
 
-### 3.2 component_remove_component
-从节点移除组件
+### 3.3 `component_set_component_property`
 
-**参数**:
-- `nodeUuid` (string, 必需): 节点UUID
-- `componentType` (string, 必需): 要移除的组件类型
+- 用途：COMPONENT PROPERTY SETTER
+- action：`(none)`
+- 关键参数：`nodeUuid`、`componentType`
+- 最小调用示例：
 
-**示例**:
-```json
-{
-  "tool": "component_remove_component",
-  "arguments": {
-    "nodeUuid": "node-uuid-here",
-    "componentType": "cc.Sprite"
-  }
-}
-```
-
-### 3.3 component_get_components
-获取节点的所有组件
-
-**参数**:
-- `nodeUuid` (string, 必需): 节点UUID
-
-**示例**:
-```json
-{
-  "tool": "component_get_components",
-  "arguments": {
-    "nodeUuid": "node-uuid-here"
-  }
-}
-```
-
-### 3.4 component_get_component_info
-获取特定组件信息
-
-**参数**:
-- `nodeUuid` (string, 必需): 节点UUID
-- `componentType` (string, 必需): 要获取信息的组件类型
-
-**示例**:
-```json
-{
-  "tool": "component_get_component_info",
-  "arguments": {
-    "nodeUuid": "node-uuid-here",
-    "componentType": "cc.Sprite"
-  }
-}
-```
-
-### 3.5 component_set_component_property
-设置单个组件属性值
-
-**参数**:
-- `nodeUuid` (string, 必需): 节点UUID
-- `componentType` (string, 必需): 组件类型
-- `property` (string, 必需): 属性名称
-- `propertyType` (string, 必需): 属性类型（如 `string`、`number`、`color`、`spriteFrame` 等）
-- `value` (any, 必需): 属性值
-
-**示例**:
 ```json
 {
   "tool": "component_set_component_property",
   "arguments": {
-    "nodeUuid": "node-uuid-here",
-    "componentType": "cc.Sprite",
-    "property": "spriteFrame",
-    "propertyType": "spriteFrame",
-    "value": "sprite-frame-uuid"
+    "nodeUuid": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "componentType": "example"
   }
 }
 ```
 
-### 3.6 component_set_component_properties
-批量设置组件属性值（一次设置多个属性，减少多次调用开销）
+### 3.4 `component_configure_click_event`
 
-**参数**:
-- `nodeUuid` (string, 必需): 节点UUID
-- `componentType` (string, 必需): 组件类型
-- `properties` (array, 必需): 要设置的属性列表（每项包含 `property`、`propertyType`、`value`）
-- `continueOnError` (boolean, 可选): 遇到失败项是否继续处理后续项，默认为 true
+- 用途：Configure or remove click events for Button components.
+- action：`(none)`
+- 关键参数：`nodeUuid`
+- 最小调用示例：
 
-**示例**:
 ```json
 {
-  "tool": "component_set_component_properties",
+  "tool": "component_configure_click_event",
   "arguments": {
-    "nodeUuid": "node-uuid-here",
-    "componentType": "cc.Label",
-    "continueOnError": true,
-    "properties": [
-      { "property": "string", "propertyType": "string", "value": "Hello MCP" },
-      { "property": "fontSize", "propertyType": "number", "value": 32 },
-      { "property": "color", "propertyType": "color", "value": { "r": 255, "g": 0, "b": 0, "a": 255 } }
-    ]
+    "nodeUuid": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
   }
 }
 ```
 
-### 3.7 component_attach_script
-向节点附加脚本组件
+## 4. 预制体工具（4）
 
-**参数**:
-- `nodeUuid` (string, 必需): 节点UUID
-- `scriptPath` (string, 必需): 脚本资源路径
+### 4.1 `prefab_prefab_browse`
 
-**示例**:
+- 用途：PREFAB BROWSER
+- action：`list`、`info`、`validate`
+- 关键参数：`action`
+- 最小调用示例：
+
 ```json
 {
-  "tool": "component_attach_script",
+  "tool": "prefab_prefab_browse",
   "arguments": {
-    "nodeUuid": "node-uuid-here",
-    "scriptPath": "db://assets/scripts/PlayerController.ts"
+    "action": "list"
   }
 }
 ```
 
-### 3.8 component_get_available_components
-获取可用组件类型列表
+### 4.2 `prefab_prefab_lifecycle`
 
-**参数**:
-- `category` (string, 可选): 组件类别过滤器，可选值：`all`、`renderer`、`ui`、`physics`、`animation`、`audio`，默认为 `all`
+- 用途：PREFAB LIFECYCLE
+- action：`create`、`delete`
+- 关键参数：`action`、`nodeUuid`
+- 最小调用示例：
 
-**示例**:
 ```json
 {
-  "tool": "component_get_available_components",
+  "tool": "prefab_prefab_lifecycle",
   "arguments": {
-    "category": "ui"
+    "action": "create"
   }
 }
 ```
 
----
+### 4.3 `prefab_prefab_instance`
 
-## 4. 预制体操作工具 (Prefab Tools)
+- 用途：PREFAB INSTANCES
+- action：`instantiate`、`unlink`、`apply`、`revert`
+- 关键参数：`action`、`nodeUuid`
+- 最小调用示例：
 
-**⚠️ 已知问题**: 使用标准 Cocos Creator API 进行预制体实例化时，可能无法正确恢复包含子节点的复杂预制体结构。虽然预制体创建功能可以正确保存所有子节点信息，但通过 `create-node` 配合 `assetUuid` 进行的实例化过程存在限制，可能导致实例化的预制体中缺少子节点。
-
-### 4.1 prefab_get_prefab_list
-获取项目中所有预制体
-
-**参数**:
-- `folder` (string, 可选): 搜索文件夹路径，默认为 `db://assets`
-
-**示例**:
 ```json
 {
-  "tool": "prefab_get_prefab_list",
+  "tool": "prefab_prefab_instance",
   "arguments": {
-    "folder": "db://assets/prefabs"
+    "action": "instantiate"
   }
 }
 ```
 
-### 4.2 prefab_load_prefab
-通过路径加载预制体
+### 4.4 `prefab_prefab_edit`
 
-**参数**:
-- `prefabPath` (string, 必需): 预制体资源路径
+- 用途：PREFAB EDIT WORKFLOW
+- action：`enter`、`save`、`exit`、`test`
+- 关键参数：`action`、`prefabPath`
+- 最小调用示例：
 
-**示例**:
 ```json
 {
-  "tool": "prefab_load_prefab",
+  "tool": "prefab_prefab_edit",
   "arguments": {
-    "prefabPath": "db://assets/prefabs/Enemy.prefab"
+    "action": "enter",
+    "prefabPath": "db://assets/example"
   }
 }
 ```
 
-### 4.3 prefab_instantiate_prefab
-在场景中实例化预制体
+## 5. 项目工具（2）
 
-**参数**:
-- `prefabPath` (string, 必需): 预制体资源路径
-- `parentUuid` (string, 可选): 父节点UUID
-- `position` (object, 可选): 初始位置，包含 x、y、z 属性
+### 5.1 `project_project_manage`
 
-**示例**:
+- 用途：PROJECT MANAGEMENT
+- action：`run`、`build`、`get_info`、`get_settings`
+- 关键参数：`action`、`category`
+- 最小调用示例：
+
 ```json
 {
-  "tool": "prefab_instantiate_prefab",
+  "tool": "project_project_manage",
   "arguments": {
-    "prefabPath": "db://assets/prefabs/Enemy.prefab",
-    "parentUuid": "parent-uuid-here",
-    "position": {"x": 100, "y": 200, "z": 0}
+    "action": "run"
   }
 }
 ```
 
-**⚠️ 功能限制**: 包含子节点的复杂预制体可能无法正确实例化。由于 Cocos Creator API 在标准 `create-node` 方法中使用 `assetUuid` 的限制，可能只创建根节点，子节点可能会丢失。这是当前实现的已知问题。
+### 5.2 `project_project_build_system`
 
-### 4.4 prefab_create_prefab
-从节点创建预制体
+- 用途：BUILD SYSTEM
+- action：`get_build_settings`、`open_build_panel`、`check_builder_status`、`start_preview_server`、`stop_preview_server`
+- 关键参数：`action`
+- 最小调用示例：
 
-**参数**:
-- `nodeUuid` (string, 必需): 源节点UUID
-- `savePath` (string, 必需): 保存预制体的路径
-- `prefabName` (string, 必需): 预制体名称
-
-**示例**:
 ```json
 {
-  "tool": "prefab_create_prefab",
+  "tool": "project_project_build_system",
   "arguments": {
-    "nodeUuid": "node-uuid-here",
-    "savePath": "db://assets/prefabs/",
-    "prefabName": "MyPrefab"
+    "action": "get_build_settings"
   }
 }
 ```
 
-### 4.5 prefab_create_prefab_from_node
-从节点创建预制体（create_prefab 的别名）
+## 6. 调试工具（3）
 
-**参数**:
-- `nodeUuid` (string, 必需): 源节点UUID
-- `prefabPath` (string, 必需): 保存预制体的路径
+### 6.1 `debug_debug_console`
 
-**示例**:
+- 用途：CONSOLE MANAGEMENT
+- action：`get_logs`、`clear`
+- 关键参数：`action`
+- 最小调用示例：
+
 ```json
 {
-  "tool": "prefab_create_prefab_from_node",
+  "tool": "debug_debug_console",
   "arguments": {
-    "nodeUuid": "node-uuid-here",
-    "prefabPath": "db://assets/prefabs/MyPrefab.prefab"
+    "action": "get_logs"
   }
 }
 ```
 
-### 4.6 prefab_update_prefab
-更新现有预制体
+### 6.2 `debug_debug_logs`
 
-**参数**:
-- `prefabPath` (string, 必需): 预制体资源路径
-- `nodeUuid` (string, 必需): 包含更改的节点UUID
+- 用途：PROJECT LOG ANALYSIS
+- action：`read`、`search`、`info`
+- 关键参数：`action`
+- 最小调用示例：
 
-**示例**:
 ```json
 {
-  "tool": "prefab_update_prefab",
+  "tool": "debug_debug_logs",
   "arguments": {
-    "prefabPath": "db://assets/prefabs/Enemy.prefab",
-    "nodeUuid": "node-uuid-here"
+    "action": "read"
   }
 }
 ```
 
-### 4.7 prefab_revert_prefab
-将预制体实例恢复为原始状态
+### 6.3 `debug_debug_system`
 
-**参数**:
-- `nodeUuid` (string, 必需): 预制体实例节点UUID
+- 用途：SYSTEM INFORMATION
+- action：`editor_info`、`performance`
+- 关键参数：`action`
+- 最小调用示例：
 
-**示例**:
 ```json
 {
-  "tool": "prefab_revert_prefab",
+  "tool": "debug_debug_system",
   "arguments": {
-    "nodeUuid": "prefab-instance-uuid-here"
+    "action": "editor_info"
   }
 }
 ```
 
-### 4.8 prefab_get_prefab_info
-获取详细的预制体信息
+## 7. 偏好设置工具（3）
 
-**参数**:
-- `prefabPath` (string, 必需): 预制体资源路径
+### 7.1 `preferences_preferences_manage`
 
-**示例**:
+- 用途：PREFERENCES MANAGEMENT
+- action：`open_panel`、`get_config`、`set_config`、`reset_config`
+- 关键参数：`action`、`path`、`category`
+- 最小调用示例：
+
 ```json
 {
-  "tool": "prefab_get_prefab_info",
+  "tool": "preferences_preferences_manage",
   "arguments": {
-    "prefabPath": "db://assets/prefabs/Enemy.prefab"
+    "action": "open_panel"
   }
 }
 ```
 
----
+### 7.2 `preferences_preferences_query`
 
-## 5. 项目控制工具 (Project Tools)
+- 用途：PREFERENCES QUERY
+- action：`get_all`、`list_categories`、`search_settings`
+- 关键参数：`action`
+- 最小调用示例：
 
-### 5.1 project_run_project
-在预览模式下运行项目
-
-**参数**:
-- `platform` (string, 可选): 目标平台，可选值：`browser`、`simulator`、`preview`，默认为 `browser`
-
-**示例**:
 ```json
 {
-  "tool": "project_run_project",
+  "tool": "preferences_preferences_query",
   "arguments": {
-    "platform": "browser"
+    "action": "get_all"
   }
 }
 ```
 
-### 5.2 project_build_project
-构建项目
+### 7.3 `preferences_preferences_backup`
 
-**参数**:
-- `platform` (string, 必需): 构建平台，可选值：`web-mobile`、`web-desktop`、`ios`、`android`、`windows`、`mac`
-- `debug` (boolean, 可选): 是否调试构建，默认为 true
+- 用途：PREFERENCES BACKUP
+- action：`export`、`validate_backup`
+- 关键参数：`action`
+- 最小调用示例：
 
-**示例**:
 ```json
 {
-  "tool": "project_build_project",
+  "tool": "preferences_preferences_backup",
   "arguments": {
-    "platform": "web-mobile",
-    "debug": false
+    "action": "export"
   }
 }
 ```
 
-### 5.3 project_get_project_info
-获取项目信息
+## 8. 服务器工具（2）
 
-**参数**: 无
+### 8.1 `server_server_information`
 
-**示例**:
+- 用途：SERVER INFORMATION
+- action：`get_ip_list`、`get_sorted_ip_list`、`get_port`、`get_comprehensive_status`
+- 关键参数：`action`
+- 最小调用示例：
+
 ```json
 {
-  "tool": "project_get_project_info",
-  "arguments": {}
-}
-```
-
-### 5.4 project_get_project_settings
-获取项目设置
-
-**参数**:
-- `category` (string, 可选): 设置类别，可选值：`general`、`physics`、`render`、`assets`，默认为 `general`
-
-**示例**:
-```json
-{
-  "tool": "project_get_project_settings",
+  "tool": "server_server_information",
   "arguments": {
-    "category": "physics"
+    "action": "get_ip_list"
   }
 }
 ```
 
-### 5.5 project_refresh_assets
-刷新资源数据库
+### 8.2 `server_server_connectivity`
 
-**参数**:
-- `folder` (string, 可选): 要刷新的特定文件夹
+- 用途：SERVER CONNECTIVITY
+- action：`test_connectivity`、`get_network_interfaces`
+- 关键参数：`action`
+- 最小调用示例：
 
-**示例**:
 ```json
 {
-  "tool": "project_refresh_assets",
+  "tool": "server_server_connectivity",
   "arguments": {
-    "folder": "db://assets/textures"
+    "action": "test_connectivity"
   }
 }
 ```
 
-### 5.6 project_import_asset
-导入资源文件
+## 9. 广播工具（2）
 
-**参数**:
-- `sourcePath` (string, 必需): 源文件路径
-- `targetFolder` (string, 必需): 资源中的目标文件夹
+### 9.1 `broadcast_broadcast_log_management`
 
-**示例**:
+- 用途：BROADCAST LOG MANAGEMENT
+- action：`get_log`、`clear_log`
+- 关键参数：`action`
+- 最小调用示例：
+
 ```json
 {
-  "tool": "project_import_asset",
+  "tool": "broadcast_broadcast_log_management",
   "arguments": {
-    "sourcePath": "/path/to/image.png",
-    "targetFolder": "db://assets/textures"
+    "action": "get_log"
   }
 }
 ```
 
-### 5.7 project_get_asset_info
-获取资源信息
+### 9.2 `broadcast_broadcast_listener_management`
 
-**参数**:
-- `assetPath` (string, 必需): 资源路径
+- 用途：BROADCAST LISTENER MANAGEMENT
+- action：`start_listening`、`stop_listening`、`get_active_listeners`
+- 关键参数：`action`
+- 最小调用示例：
 
-**示例**:
 ```json
 {
-  "tool": "project_get_asset_info",
+  "tool": "broadcast_broadcast_listener_management",
   "arguments": {
-    "assetPath": "db://assets/textures/player.png"
+    "action": "start_listening"
   }
 }
 ```
 
-### 5.8 project_get_assets
-按类型获取资源
+## 10. 场景视图工具（5）
 
-**参数**:
-- `type` (string, 可选): 资源类型过滤器，可选值：`all`、`scene`、`prefab`、`script`、`texture`、`material`、`mesh`、`audio`、`animation`，默认为 `all`
-- `folder` (string, 可选): 搜索文件夹，默认为 `db://assets`
+### 10.1 `sceneView_scene_view_gizmo_management`
 
-**示例**:
+- 用途：GIZMO MANAGEMENT
+- action：`change_tool`、`query_tool`、`change_pivot`、`query_pivot`、`change_coordinate`、`query_coordinate`、`query_view_mode`
+- 关键参数：`action`
+- 最小调用示例：
+
 ```json
 {
-  "tool": "project_get_assets",
+  "tool": "sceneView_scene_view_gizmo_management",
   "arguments": {
-    "type": "texture",
-    "folder": "db://assets/textures"
+    "action": "change_tool"
   }
 }
 ```
 
-### 5.9 project_get_build_settings
-获取构建设置
+### 10.2 `sceneView_scene_view_mode_control`
 
-**参数**: 无
+- 用途：VIEW MODE CONTROL
+- action：`change_2d_3d`、`query_2d_3d`、`set_grid`、`query_grid`
+- 关键参数：`action`
+- 最小调用示例：
 
-**示例**:
 ```json
 {
-  "tool": "project_get_build_settings",
-  "arguments": {}
-}
-```
-
-### 5.10 project_open_build_panel
-在编辑器中打开构建面板
-
-**参数**: 无
-
-**示例**:
-```json
-{
-  "tool": "project_open_build_panel",
-  "arguments": {}
-}
-```
-
-### 5.11 project_check_builder_status
-检查构建器工作进程是否就绪
-
-**参数**: 无
-
-**示例**:
-```json
-{
-  "tool": "project_check_builder_status",
-  "arguments": {}
-}
-```
-
-### 5.12 project_start_preview_server
-启动预览服务器
-
-**参数**:
-- `port` (number, 可选): 预览服务器端口，默认为 7456
-
-**示例**:
-```json
-{
-  "tool": "project_start_preview_server",
+  "tool": "sceneView_scene_view_mode_control",
   "arguments": {
-    "port": 8080
+    "action": "change_2d_3d"
   }
 }
 ```
 
-### 5.13 project_stop_preview_server
-停止预览服务器
+### 10.3 `sceneView_scene_view_icon_gizmo`
 
-**参数**: 无
+- 用途：ICON GIZMO CONTROL
+- action：`set_3d_mode`、`query_3d_mode`、`set_size`、`query_size`
+- 关键参数：`action`
+- 最小调用示例：
 
-**示例**:
 ```json
 {
-  "tool": "project_stop_preview_server",
-  "arguments": {}
-}
-```
-
-### 5.14 project_create_asset
-创建新的资源文件或文件夹
-
-**参数**:
-- `url` (string, 必需): 资源URL
-- `content` (string, 可选): 文件内容，null 表示创建文件夹
-- `overwrite` (boolean, 可选): 是否覆盖现有文件，默认为 false
-
-**示例**:
-```json
-{
-  "tool": "project_create_asset",
+  "tool": "sceneView_scene_view_icon_gizmo",
   "arguments": {
-    "url": "db://assets/scripts/NewScript.ts",
-    "content": "// New TypeScript script\n",
-    "overwrite": false
+    "action": "set_3d_mode"
   }
 }
 ```
 
-### 5.15 project_copy_asset
-复制资源到另一个位置
+### 10.4 `sceneView_scene_view_camera_control`
 
-**参数**:
-- `source` (string, 必需): 源资源URL
-- `target` (string, 必需): 目标位置URL
-- `overwrite` (boolean, 可选): 是否覆盖现有文件，默认为 false
+- 用途：CAMERA CONTROL
+- action：`focus_on_nodes`、`align_camera_with_view`、`align_view_with_node`
+- 关键参数：`action`
+- 最小调用示例：
 
-**示例**:
 ```json
 {
-  "tool": "project_copy_asset",
+  "tool": "sceneView_scene_view_camera_control",
   "arguments": {
-    "source": "db://assets/textures/player.png",
-    "target": "db://assets/textures/backup/player.png",
-    "overwrite": false
+    "action": "focus_on_nodes"
   }
 }
 ```
 
-### 5.16 project_move_asset
-移动资源到另一个位置
+### 10.5 `sceneView_scene_view_status_management`
 
-**参数**:
-- `source` (string, 必需): 源资源URL
-- `target` (string, 必需): 目标位置URL
-- `overwrite` (boolean, 可选): 是否覆盖现有文件，默认为 false
+- 用途：STATUS MANAGEMENT
+- action：`get_status`、`reset_view`
+- 关键参数：`action`
+- 最小调用示例：
 
-**示例**:
 ```json
 {
-  "tool": "project_move_asset",
+  "tool": "sceneView_scene_view_status_management",
   "arguments": {
-    "source": "db://assets/textures/old_player.png",
-    "target": "db://assets/textures/player.png",
-    "overwrite": true
+    "action": "get_status"
   }
 }
 ```
 
-### 5.17 project_delete_asset
-删除资源
+## 11. 参考图像工具（4）
 
-**参数**:
-- `url` (string, 必需): 要删除的资源URL
+### 11.1 `referenceImage_reference_image_management`
 
-**示例**:
+- 用途：REFERENCE IMAGE MANAGEMENT
+- action：`add`、`remove`、`switch`、`clear_all`
+- 关键参数：`action`、`path`
+- 最小调用示例：
+
 ```json
 {
-  "tool": "project_delete_asset",
+  "tool": "referenceImage_reference_image_management",
   "arguments": {
-    "url": "db://assets/textures/unused.png"
+    "action": "add"
   }
 }
 ```
 
-### 5.18 project_save_asset
-保存资源内容
+### 11.2 `referenceImage_reference_image_query`
 
-**参数**:
-- `url` (string, 必需): 资源URL
-- `content` (string, 必需): 资源内容
+- 用途：REFERENCE IMAGE QUERY
+- action：`get_config`、`get_current`、`list_all`
+- 关键参数：`action`
+- 最小调用示例：
 
-**示例**:
 ```json
 {
-  "tool": "project_save_asset",
+  "tool": "referenceImage_reference_image_query",
   "arguments": {
-    "url": "db://assets/scripts/GameManager.ts",
-    "content": "// Updated script content\n"
+    "action": "get_config"
   }
 }
 ```
 
-### 5.19 project_reimport_asset
-重新导入资源
+### 11.3 `referenceImage_reference_image_transform`
 
-**参数**:
-- `url` (string, 必需): 要重新导入的资源URL
+- 用途：REFERENCE IMAGE TRANSFORM
+- action：`set_position`、`set_scale`、`set_opacity`、`set_data`
+- 关键参数：`action`
+- 最小调用示例：
 
-**示例**:
 ```json
 {
-  "tool": "project_reimport_asset",
+  "tool": "referenceImage_reference_image_transform",
   "arguments": {
-    "url": "db://assets/textures/player.png"
+    "action": "set_position"
   }
 }
 ```
 
-### 5.20 project_query_asset_path
-获取资源磁盘路径
+### 11.4 `referenceImage_reference_image_display`
 
-**参数**:
-- `url` (string, 必需): 资源URL
+- 用途：REFERENCE IMAGE DISPLAY
+- action：`refresh`
+- 关键参数：`action`
+- 最小调用示例：
 
-**示例**:
 ```json
 {
-  "tool": "project_query_asset_path",
+  "tool": "referenceImage_reference_image_display",
   "arguments": {
-    "url": "db://assets/textures/player.png"
+    "action": "refresh"
   }
 }
 ```
 
-### 5.21 project_query_asset_uuid
-从URL获取资源UUID
+## 12. 资源高级工具（5）
 
-**参数**:
-- `url` (string, 必需): 资源URL
+### 12.1 `assetAdvanced_asset_manage`
 
-**示例**:
+- 用途：ASSET MANAGEMENT
+- action：`import`、`delete`、`save_meta`、`generate_url`
+- 关键参数：`action`
+- 最小调用示例：
+
 ```json
 {
-  "tool": "project_query_asset_uuid",
+  "tool": "assetAdvanced_asset_manage",
   "arguments": {
-    "url": "db://assets/textures/player.png"
+    "action": "import"
   }
 }
 ```
 
-### 5.22 project_query_asset_url
-从UUID获取资源URL
+### 12.2 `assetAdvanced_asset_analyze`
 
-**参数**:
-- `uuid` (string, 必需): 资源UUID
+- 用途：ASSET ANALYSIS
+- action：`dependencies`、`manifest`
+- 关键参数：`action`
+- 最小调用示例：
 
-**示例**:
 ```json
 {
-  "tool": "project_query_asset_url",
+  "tool": "assetAdvanced_asset_analyze",
   "arguments": {
-    "uuid": "asset-uuid-here"
+    "action": "dependencies"
   }
 }
 ```
 
----
+### 12.3 `assetAdvanced_asset_system`
 
-## 6. 调试工具 (Debug Tools)
+- 用途：ASSET SYSTEM
+- action：`check_ready`、`open_external`、`refresh`
+- 关键参数：`action`
+- 最小调用示例：
 
-### 6.1 debug_get_console_logs
-获取编辑器控制台日志
-
-**参数**:
-- `limit` (number, 可选): 要检索的最新日志数量，默认为 100
-- `filter` (string, 可选): 按类型过滤日志，可选值：`all`、`log`、`warn`、`error`、`info`，默认为 `all`
-
-**示例**:
 ```json
 {
-  "tool": "debug_get_console_logs",
+  "tool": "assetAdvanced_asset_system",
   "arguments": {
-    "limit": 50,
-    "filter": "error"
+    "action": "check_ready"
   }
 }
 ```
 
-### 6.2 debug_clear_console
-清空编辑器控制台
+### 12.4 `assetAdvanced_asset_query`
 
-**参数**: 无
+- 用途：ASSET QUERY
+- action：`get_info`、`get_assets`、`find_by_name`、`get_details`、`query_path`、`query_uuid`、`query_url`
+- 关键参数：`action`、`uuid`
+- 最小调用示例：
 
-**示例**:
 ```json
 {
-  "tool": "debug_clear_console",
-  "arguments": {}
-}
-```
-
-### 6.3 debug_execute_script
-在场景上下文中执行JavaScript代码
-
-**参数**:
-- `script` (string, 必需): 要执行的JavaScript代码
-
-**示例**:
-```json
-{
-  "tool": "debug_execute_script",
+  "tool": "assetAdvanced_asset_query",
   "arguments": {
-    "script": "console.log('Hello from MCP!');"
+    "action": "get_info"
   }
 }
 ```
 
-### 6.4 debug_get_node_tree
-获取用于调试的详细节点树
+### 12.5 `assetAdvanced_asset_operations`
 
-**参数**:
-- `rootUuid` (string, 可选): 根节点UUID，如果不提供则使用场景根节点
-- `maxDepth` (number, 可选): 最大树深度，默认为 10
+- 用途：ASSET OPERATIONS
+- action：`create`、`copy`、`move`、`delete`、`save`、`reimport`、`import`
+- 关键参数：`action`
+- 最小调用示例：
 
-**示例**:
 ```json
 {
-  "tool": "debug_get_node_tree",
+  "tool": "assetAdvanced_asset_operations",
   "arguments": {
-    "rootUuid": "root-node-uuid",
-    "maxDepth": 5
+    "action": "create"
   }
 }
 ```
 
-### 6.5 debug_get_performance_stats
-获取性能统计信息
+## 13. 验证工具（3）
 
-**参数**: 无
+### 13.1 `validation_validate_json_params`
 
-**示例**:
+- 用途：JSON PARAMETER VALIDATION
+- action：`(none)`
+- 关键参数：`jsonString`
+- 最小调用示例：
+
 ```json
 {
-  "tool": "debug_get_performance_stats",
-  "arguments": {}
-}
-```
-
-### 6.6 debug_validate_scene
-验证当前场景是否有问题
-
-**参数**:
-- `checkMissingAssets` (boolean, 可选): 检查缺失的资源引用，默认为 true
-- `checkPerformance` (boolean, 可选): 检查性能问题，默认为 true
-
-**示例**:
-```json
-{
-  "tool": "debug_validate_scene",
+  "tool": "validation_validate_json_params",
   "arguments": {
-    "checkMissingAssets": true,
-    "checkPerformance": true
+    "jsonString": "example"
   }
 }
 ```
 
-### 6.7 debug_get_editor_info
-获取编辑器和环境信息
+### 13.2 `validation_safe_string_value`
 
-**参数**: 无
+- 用途：STRING SAFETY
+- action：`(none)`
+- 关键参数：`value`
+- 最小调用示例：
 
-**示例**:
 ```json
 {
-  "tool": "debug_get_editor_info",
-  "arguments": {}
-}
-```
-
-### 6.8 debug_get_project_logs
-从 temp/logs/project.log 文件获取项目日志
-
-**参数**:
-- `lines` (number, 可选): 从日志文件末尾读取的行数，默认值为100，范围：1-10000
-- `filterKeyword` (string, 可选): 按指定关键词过滤日志
-- `logLevel` (string, 可选): 按日志级别过滤，选项：`ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`, `ALL`，默认为 `ALL`
-
-**示例**:
-```json
-{
-  "tool": "debug_get_project_logs",
+  "tool": "validation_safe_string_value",
   "arguments": {
-    "lines": 200,
-    "filterKeyword": "prefab",
-    "logLevel": "INFO"
+    "value": "example"
   }
 }
 ```
 
-### 6.9 debug_get_log_file_info
-获取项目日志文件信息
+### 13.3 `validation_format_mcp_request`
 
-**参数**: 无
+- 用途：MCP REQUEST FORMATTING
+- action：`(none)`
+- 关键参数：`toolName`、`arguments`
+- 最小调用示例：
 
-**返回**: 文件大小、最后修改时间、行数和文件路径信息
-
-**示例**:
 ```json
 {
-  "tool": "debug_get_log_file_info",
-  "arguments": {}
-}
-```
-
-### 6.10 debug_search_project_logs
-在项目日志中搜索特定模式或错误
-
-**参数**:
-- `pattern` (string, 必需): 搜索模式（支持正则表达式）
-- `maxResults` (number, 可选): 最大匹配结果数量，默认为20，范围：1-100
-- `contextLines` (number, 可选): 匹配结果周围显示的上下文行数，默认为2，范围：0-10
-
-**示例**:
-```json
-{
-  "tool": "debug_search_project_logs",
+  "tool": "validation_format_mcp_request",
   "arguments": {
-    "pattern": "error|failed|exception",
-    "maxResults": 10,
-    "contextLines": 3
+    "toolName": "example-name",
+    "arguments": {}
   }
 }
 ```
 
----
-
-## 7. 偏好设置工具 (Preferences Tools)
-
-### 7.1 preferences_get_preferences
-获取编辑器偏好设置
-
-**参数**:
-- `key` (string, 可选): 要获取的特定偏好设置键
-
-**示例**:
-```json
-{
-  "tool": "preferences_get_preferences",
-  "arguments": {
-    "key": "editor.theme"
-  }
-}
-```
-
-### 7.2 preferences_set_preferences
-设置编辑器偏好设置
-
-**参数**:
-- `key` (string, 必需): 要设置的偏好设置键
-- `value` (any, 必需): 要设置的偏好设置值
-
-**示例**:
-```json
-{
-  "tool": "preferences_set_preferences",
-  "arguments": {
-    "key": "editor.theme",
-    "value": "dark"
-  }
-}
-```
-
-### 7.3 preferences_get_global_preferences
-获取全局编辑器偏好设置
-
-**参数**:
-- `key` (string, 可选): 要获取的全局偏好设置键
-
-**示例**:
-```json
-{
-  "tool": "preferences_get_global_preferences",
-  "arguments": {
-    "key": "global.autoSave"
-  }
-}
-```
-
-### 7.4 preferences_set_global_preferences
-设置全局编辑器偏好设置
-
-**参数**:
-- `key` (string, 必需): 要设置的全局偏好设置键
-- `value` (any, 必需): 要设置的全局偏好设置值
-
-**示例**:
-```json
-{
-  "tool": "preferences_set_global_preferences",
-  "arguments": {
-    "key": "global.autoSave",
-    "value": true
-  }
-}
-```
-
-### 7.5 preferences_get_recent_projects
-获取最近打开的项目
-
-**参数**: 无
-
-**示例**:
-```json
-{
-  "tool": "preferences_get_recent_projects",
-  "arguments": {}
-}
-```
-
-### 7.6 preferences_clear_recent_projects
-清除最近打开的项目列表
-
-**参数**: 无
-
-**示例**:
-```json
-{
-  "tool": "preferences_clear_recent_projects",
-  "arguments": {}
-}
-```
-
----
-
-## 8. 服务器工具 (Server Tools)
-
-### 8.1 server_get_server_info
-获取服务器信息
-
-**参数**: 无
-
-**示例**:
-```json
-{
-  "tool": "server_get_server_info",
-  "arguments": {}
-}
-```
-
-### 8.2 server_broadcast_custom_message
-广播自定义消息
-
-**参数**:
-- `message` (string, 必需): 消息名称
-- `data` (any, 可选): 消息数据
-
-**示例**:
-```json
-{
-  "tool": "server_broadcast_custom_message",
-  "arguments": {
-    "message": "custom_event",
-    "data": {"type": "test", "value": 123}
-  }
-}
-```
-
-### 8.3 server_get_editor_version
-获取编辑器版本信息
-
-**参数**: 无
-
-**示例**:
-```json
-{
-  "tool": "server_get_editor_version",
-  "arguments": {}
-}
-```
-
-### 8.4 server_get_project_name
-获取当前项目名称
-
-**参数**: 无
-
-**示例**:
-```json
-{
-  "tool": "server_get_project_name",
-  "arguments": {}
-}
-```
-
-### 8.5 server_get_project_path
-获取当前项目路径
-
-**参数**: 无
-
-**示例**:
-```json
-{
-  "tool": "server_get_project_path",
-  "arguments": {}
-}
-```
-
-### 8.6 server_get_project_uuid
-获取当前项目UUID
-
-**参数**: 无
-
-**示例**:
-```json
-{
-  "tool": "server_get_project_uuid",
-  "arguments": {}
-}
-```
-
-### 8.7 server_restart_editor
-请求重启编辑器
-
-**参数**: 无
-
-**示例**:
-```json
-{
-  "tool": "server_restart_editor",
-  "arguments": {}
-}
-```
-
-### 8.8 server_quit_editor
-请求退出编辑器
-
-**参数**: 无
-
-**示例**:
-```json
-{
-  "tool": "server_quit_editor",
-  "arguments": {}
-}
-```
-
----
-
-## 9. 广播工具 (Broadcast Tools)
-
-### 9.1 broadcast_get_broadcast_log
-获取最近的广播消息日志
-
-**参数**:
-- `limit` (number, 可选): 要返回的最新消息数量，默认为 50
-- `messageType` (string, 可选): 按消息类型过滤
-
-**示例**:
-```json
-{
-  "tool": "broadcast_get_broadcast_log",
-  "arguments": {
-    "limit": 100,
-    "messageType": "scene_change"
-  }
-}
-```
-
-### 9.2 broadcast_listen_broadcast
-开始监听特定广播消息
-
-**参数**:
-- `messageType` (string, 必需): 要监听的消息类型
-
-**示例**:
-```json
-{
-  "tool": "broadcast_listen_broadcast",
-  "arguments": {
-    "messageType": "node_created"
-  }
-}
-```
-
-### 9.3 broadcast_stop_listening
-停止监听特定广播消息
-
-**参数**:
-- `messageType` (string, 必需): 要停止监听的消息类型
-
-**示例**:
-```json
-{
-  "tool": "broadcast_stop_listening",
-  "arguments": {
-    "messageType": "node_created"
-  }
-}
-```
-
-### 9.4 broadcast_clear_broadcast_log
-清除广播消息日志
-
-**参数**: 无
-
-**示例**:
-```json
-{
-  "tool": "broadcast_clear_broadcast_log",
-  "arguments": {}
-}
-```
-
-### 9.5 broadcast_get_active_listeners
-获取活动广播监听器列表
-
-**参数**: 无
-
-**示例**:
-```json
-{
-  "tool": "broadcast_get_active_listeners",
-  "arguments": {}
-}
-```
-
----
-
-## 使用须知
-
-### 1. 工具调用格式
-
-所有工具调用都使用 JSON-RPC 2.0 格式：
-
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "tools/call",
-  "params": {
-    "name": "tool_name",
-    "arguments": {
-      // 工具参数
-    }
-  },
-  "id": 1
-}
-```
-
-### 2. 常见UUID获取方法
-
-- 使用 `node_get_all_nodes` 获取所有节点UUID
-- 使用 `node_find_node_by_name` 按名称查找节点UUID
-- 使用 `scene_get_current_scene` 获取场景UUID
-- 使用 `prefab_get_prefab_list` 获取预制体信息
-
-### 3. 资源路径格式
-
-Cocos Creator 使用 `db://` 前缀的资源URL格式：
-- 场景：`db://assets/scenes/GameScene.scene`
-- 预制体：`db://assets/prefabs/Player.prefab`
-- 脚本：`db://assets/scripts/GameManager.ts`
-- 纹理：`db://assets/textures/player.png`
-
-### 4. 错误处理
-
-如果工具调用失败，会返回错误信息：
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "error": {
-    "code": -32000,
-    "message": "Tool execution failed",
-    "data": {
-      "error": "详细错误信息"
-    }
-  }
-}
-```
-
-### 5. 最佳实践
-
-1. **先查询再操作**：在修改节点或组件之前，先使用查询工具获取当前状态
-2. **使用UUID**：尽量使用UUID而不是名称来引用节点和资源
-3. **错误检查**：始终检查工具调用的返回值，确保操作成功
-4. **资源管理**：在删除或移动资源前，确保没有其他地方引用它们
-5. **性能考虑**：避免在循环中频繁调用工具，考虑批量操作
-
----
-
-## 技术支持
-
-如果您在使用过程中遇到问题，可以：
-
-1. 使用 `debug_get_console_logs` 查看详细的错误日志
-2. 使用 `debug_validate_scene` 检查场景是否有问题
-3. 使用 `debug_get_editor_info` 获取环境信息
-4. 检查 MCP 服务器的运行状态和日志
-
----
-
-*此文档基于 Cocos Creator MCP 服务器 v1.3.0 编写，如有更新请参考最新版本文档。*
+## 兼容与弃用说明
+
+- 旧场景高级前缀工具不再暴露，也不再兼容调用。
+- 无分类前缀旧名（如 `create_node`）不在文档承诺范围内。
+- 以当前 `source/tools/*.ts` 的 `getTools()` 与 `action enum` 为最终依据。

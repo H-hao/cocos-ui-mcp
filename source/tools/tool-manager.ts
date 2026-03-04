@@ -10,6 +10,7 @@ export class ToolManager {
     constructor() {
         this.settings = this.readToolManagerSettings();
         this.initializeAvailableTools();
+        this.migrateConfigurationsToAvailableTools();
         
         // 如果没有配置，自动创建一个默认配置
         if (this.settings.configurations.length === 0) {
@@ -47,6 +48,60 @@ export class ToolManager {
             console.error('Failed to read tool manager settings:', e);
         }
         return DEFAULT_TOOL_MANAGER_SETTINGS;
+    }
+
+    private migrateConfigurationsToAvailableTools(): void {
+        if (!this.settings.configurations.length || !this.availableTools.length) {
+            return;
+        }
+
+        let changed = false;
+        const now = new Date().toISOString();
+
+        this.settings.configurations = this.settings.configurations.map((config) => {
+            const enabledMap = new Map<string, boolean>();
+            (config.tools || []).forEach((tool) => {
+                enabledMap.set(`${tool.category}:${tool.name}`, tool.enabled !== false);
+            });
+
+            const nextTools = this.availableTools.map((tool) => {
+                const key = `${tool.category}:${tool.name}`;
+                return {
+                    ...tool,
+                    enabled: enabledMap.has(key) ? Boolean(enabledMap.get(key)) : true,
+                };
+            });
+
+            const sameSize = Array.isArray(config.tools) && config.tools.length === nextTools.length;
+            const sameKeys = sameSize && config.tools.every((tool, index) => {
+                const next = nextTools[index];
+                return tool.category === next.category && tool.name === next.name && tool.enabled === next.enabled;
+            });
+
+            if (sameKeys) {
+                return config;
+            }
+
+            changed = true;
+            return {
+                ...config,
+                tools: nextTools,
+                updatedAt: now,
+            };
+        });
+
+        if (this.settings.currentConfigId) {
+            const exists = this.settings.configurations.some((config) => config.id === this.settings.currentConfigId);
+            if (!exists) {
+                this.settings.currentConfigId = this.settings.configurations[0]?.id || '';
+                changed = true;
+            }
+        }
+
+        if (changed) {
+            this.saveToolManagerSettings(this.settings);
+            console.log('[ToolManager] Migrated legacy tool configurations to latest tool set');
+        }
     }
 
     private saveToolManagerSettings(settings: ToolManagerSettings): void {
@@ -91,7 +146,7 @@ export class ToolManager {
             const { PreferencesTools } = require('./preferences-tools');
             const { ServerTools } = require('./server-tools');
             const { BroadcastTools } = require('./broadcast-tools');
-            const { SceneAdvancedTools } = require('./scene-advanced-tools');
+            // SceneAdvancedTools functionality has been integrated into NodeTools and SceneTools
             const { SceneViewTools } = require('./scene-view-tools');
             const { ReferenceImageTools } = require('./reference-image-tools');
             const { AssetAdvancedTools } = require('./asset-advanced-tools');
@@ -108,7 +163,7 @@ export class ToolManager {
                 preferences: new PreferencesTools(),
                 server: new ServerTools(),
                 broadcast: new BroadcastTools(),
-                sceneAdvanced: new SceneAdvancedTools(),
+                // sceneAdvanced functionality has been integrated into node and scene tools
                 sceneView: new SceneViewTools(),
                 referenceImage: new ReferenceImageTools(),
                 assetAdvanced: new AssetAdvancedTools(),
@@ -159,7 +214,6 @@ export class ToolManager {
                 { name: 'addComponentToNode', description: '添加组件到节点' },
                 { name: 'removeComponentFromNode', description: '从节点移除组件' },
                 { name: 'setComponentProperty', description: '设置组件属性' },
-                { name: 'setComponentProperties', description: '批量设置组件属性' },
                 { name: 'getComponentInfo', description: '获取组件信息' }
             ]},
             { category: 'prefab', name: '预制体工具', tools: [
@@ -193,11 +247,6 @@ export class ToolManager {
             { category: 'broadcast', name: '广播工具', tools: [
                 { name: 'broadcastMessage', description: '广播消息' },
                 { name: 'getBroadcastHistory', description: '获取广播历史' }
-            ]},
-            { category: 'sceneAdvanced', name: '高级场景工具', tools: [
-                { name: 'optimizeScene', description: '优化场景' },
-                { name: 'analyzeScene', description: '分析场景' },
-                { name: 'batchOperation', description: '批量操作' }
             ]},
             { category: 'sceneView', name: '场景视图工具', tools: [
                 { name: 'getViewportInfo', description: '获取视口信息' },

@@ -1,1499 +1,864 @@
-# Cocos Creator MCP Server Feature Guide
+# Cocos Creator MCP Feature Guide (v1.5.4)
 
 ## Overview
 
-The Cocos Creator MCP Server is a comprehensive Model Context Protocol (MCP) server plugin designed for Cocos Creator 3.8+, enabling AI assistants to interact with the Cocos Creator editor through standardized protocols.
+- Total tools: **50**
+- Category distribution: **5/8/4/4/2/3/3/2/2/5/4/5/3**
+- Transport: `Streamable HTTP (MCP 2025-03-26)`
+- Naming rule: use `category_tool` format (e.g. `node_node_query`)
+- Note: `sceneAdvanced` has been fully removed from the public surface.
 
-This document provides detailed information about all available MCP tools and their usage.
+## Category Index
 
-## Tool Categories
+1. Scene Tools (5)
+2. Node Tools (8)
+3. Component Tools (4)
+4. Prefab Tools (4)
+5. Project Tools (2)
+6. Debug Tools (3)
+7. Preferences Tools (3)
+8. Server Tools (2)
+9. Broadcast Tools (2)
+10. Scene View Tools (5)
+11. Reference Image Tools (4)
+12. Asset Advanced Tools (5)
+13. Validation Tools (3)
 
-The MCP server provides **158 tools** organized into 13 main categories by functionality:
+## 1. Scene Tools (5)
 
-1. [Scene Tools](#1-scene-tools)
-2. [Node Tools](#2-node-tools)
-3. [Component Management Tools](#3-component-management-tools)
-4. [Prefab Tools](#4-prefab-tools)
-5. [Project Control Tools](#5-project-control-tools)
-6. [Debug Tools](#6-debug-tools)
-7. [Preferences Tools](#7-preferences-tools)
-8. [Server Tools](#8-server-tools)
-9. [Broadcast Tools](#9-broadcast-tools)
-10. [Asset Advanced Tools](#10-asset-advanced-tools)
-11. [Reference Image Tools](#11-reference-image-tools)
-12. [Scene Advanced Tools](#12-scene-advanced-tools)
-13. [Scene View Tools](#13-scene-view-tools)
+### 1.1 `scene_scene_management`
 
----
+- Purpose: SCENE MANAGEMENT
+- actions: `get_current`, `get_list`, `open`, `save`, `create`, `save_as`, `close`
+- key params: `action`, `path`, `scenePath`
+- Minimal call example:
 
-## 1. Scene Tools
-
-### 1.1 scene_get_current_scene
-Get current scene information
-
-**Parameters**: None
-
-**Returns**: Current scene name, UUID, type, active status, and node count
-
-**Example**:
 ```json
 {
-  "tool": "scene_get_current_scene",
+  "tool": "scene_scene_management",
+  "arguments": {
+    "action": "get_current"
+  }
+}
+```
+
+### 1.2 `scene_scene_hierarchy`
+
+- Purpose: SCENE HIERARCHY
+- actions: `(none)`
+- key params: `(none)`
+- Minimal call example:
+
+```json
+{
+  "tool": "scene_scene_hierarchy",
   "arguments": {}
 }
 ```
 
-### 1.2 scene_get_scene_list
-Get all scenes in the project
+### 1.3 `scene_scene_execution_control`
 
-**Parameters**: None
+- Purpose: EXECUTION CONTROL
+- actions: `execute_component_method`, `execute_scene_script`, `restore_prefab`
+- key params: `action`, `uuid`, `nodeUuid`
+- Minimal call example:
 
-**Returns**: List of all scenes in the project, including names, paths, and UUIDs
-
-**Example**:
 ```json
 {
-  "tool": "scene_get_scene_list",
-  "arguments": {}
-}
-```
-
-### 1.3 scene_open_scene
-Open a scene by path
-
-**Parameters**:
-- `scenePath` (string, required): Scene file path
-
-**Example**:
-```json
-{
-  "tool": "scene_open_scene",
+  "tool": "scene_scene_execution_control",
   "arguments": {
-    "scenePath": "db://assets/scenes/GameScene.scene"
+    "action": "execute_component_method"
   }
 }
 ```
 
-### 1.4 scene_save_scene
-Save current scene
+### 1.4 `scene_scene_state_management`
 
-**Parameters**: None
+- Purpose: STATE MANAGEMENT
+- actions: `create_snapshot`, `abort_snapshot`, `begin_undo`, `end_undo`, `cancel_undo`, `soft_reload`
+- key params: `action`, `nodeUuid`
+- Minimal call example:
 
-**Example**:
 ```json
 {
-  "tool": "scene_save_scene",
-  "arguments": {}
-}
-```
-
-### 1.5 scene_create_scene
-Create a new scene asset
-
-**Parameters**:
-- `sceneName` (string, required): Name of the new scene
-- `savePath` (string, required): Path to save the scene
-
-**Example**:
-```json
-{
-  "tool": "scene_create_scene",
+  "tool": "scene_scene_state_management",
   "arguments": {
-    "sceneName": "NewLevel",
-    "savePath": "db://assets/scenes/NewLevel.scene"
+    "action": "create_snapshot"
   }
 }
 ```
 
-### 1.6 scene_save_scene_as
-Save scene as a new file
+### 1.5 `scene_scene_query_system`
 
-**Parameters**:
-- `path` (string, required): Path to save the scene
+- Purpose: QUERY SYSTEM
+- actions: `check_ready`, `check_dirty`, `list_classes`, `list_components`, `check_script`, `find_nodes_by_asset`
+- key params: `action`
+- Minimal call example:
 
-**Example**:
 ```json
 {
-  "tool": "scene_save_scene_as",
+  "tool": "scene_scene_query_system",
   "arguments": {
-    "path": "db://assets/scenes/GameScene_Copy.scene"
+    "action": "check_ready"
   }
 }
 ```
 
-### 1.7 scene_close_scene
-Close current scene
+## 2. Node Tools (8)
 
-**Parameters**: None
+### 2.1 `node_node_query`
 
-**Example**:
+- Purpose: NODE SEARCH & INFORMATION
+- actions: `info`, `find`, `find_by_name`, `list_all`, `detect_type`, `tree`
+- key params: `action`, `uuid`
+- Minimal call example:
+
 ```json
 {
-  "tool": "scene_close_scene",
-  "arguments": {}
-}
-```
-
-### 1.8 scene_get_scene_hierarchy
-Get the complete hierarchy of current scene
-
-**Parameters**:
-- `includeComponents` (boolean, optional): Whether to include component information, defaults to false
-
-**Example**:
-```json
-{
-  "tool": "scene_get_scene_hierarchy",
+  "tool": "node_node_query",
   "arguments": {
-    "includeComponents": true
+    "action": "info"
   }
 }
 ```
 
----
+### 2.2 `node_node_lifecycle`
 
-## 2. Node Tools
+- Purpose: NODE CREATION & DELETION
+- actions: `create`, `delete`
+- key params: `action`, `uuid`
+- Minimal call example:
 
-### 2.1 node_create_node
-Create a new node in the scene
-
-**Parameters**:
-- `name` (string, required): Node name
-- `parentUuid` (string, **strongly recommended**): Parent node UUID. **Important**: It is strongly recommended to always provide this parameter. Use `get_current_scene` or `get_all_nodes` to find parent node UUIDs. If not provided, the node will be created at the scene root.
-- `nodeType` (string, optional): Node type, options: `Node`, `2DNode`, `3DNode`, defaults to `Node`
-- `siblingIndex` (number, optional): Sibling index, -1 means append at end, defaults to -1
-
-**Important Note**: To ensure the node is created at the expected location, always provide the `parentUuid` parameter. You can obtain parent node UUIDs by:
-- Using `scene_get_current_scene` to get the scene root node UUID
-- Using `node_get_all_nodes` to view all nodes and their UUIDs
-- Using `node_find_node_by_name` to find specific node UUIDs
-
-**Example**:
 ```json
 {
-  "tool": "node_create_node",
+  "tool": "node_node_lifecycle",
   "arguments": {
-    "name": "PlayerNode",
-    "nodeType": "2DNode",
-    "parentUuid": "parent-uuid-here"
+    "action": "create"
   }
 }
 ```
 
-### 2.2 node_get_node_info
-Get node information by UUID
+### 2.3 `node_node_transform`
 
-**Parameters**:
-- `uuid` (string, required): Node UUID
+- Purpose: MODIFY NODE PROPERTIES
+- actions: `(none)`
+- key params: `uuid`
+- Minimal call example:
 
-**Example**:
 ```json
 {
-  "tool": "node_get_node_info",
+  "tool": "node_node_transform",
   "arguments": {
-    "uuid": "node-uuid-here"
+    "uuid": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
   }
 }
 ```
 
-### 2.3 node_find_nodes
-Find nodes by name pattern
+### 2.4 `node_node_hierarchy`
 
-**Parameters**:
-- `pattern` (string, required): Name pattern to search
-- `exactMatch` (boolean, optional): Whether to match exactly, defaults to false
+- Purpose: MOVE OR COPY NODES
+- actions: `move`, `duplicate`
+- key params: `action`, `uuid`, `nodeUuid`
+- Minimal call example:
 
-**Example**:
 ```json
 {
-  "tool": "node_find_nodes",
+  "tool": "node_node_hierarchy",
   "arguments": {
-    "pattern": "Enemy",
-    "exactMatch": false
+    "action": "move"
   }
 }
 ```
 
-### 2.4 node_find_node_by_name
-Find the first node by exact name
+### 2.5 `node_node_clipboard`
 
-**Parameters**:
-- `name` (string, required): Node name to find
+- Purpose: CLIPBOARD OPERATIONS
+- actions: `copy`, `paste`, `cut`
+- key params: `action`
+- Minimal call example:
 
-**Example**:
 ```json
 {
-  "tool": "node_find_node_by_name",
+  "tool": "node_node_clipboard",
   "arguments": {
-    "name": "Player"
+    "action": "copy"
   }
 }
 ```
 
-### 2.5 node_get_all_nodes
-Get all nodes in the scene with their UUIDs
+### 2.6 `node_node_property_management`
 
-**Parameters**: None
+- Purpose: PROPERTY MANAGEMENT
+- actions: `reset_property`, `reset_transform`, `reset_component`
+- key params: `action`, `uuid`, `path`
+- Minimal call example:
 
-**Example**:
 ```json
 {
-  "tool": "node_get_all_nodes",
-  "arguments": {}
-}
-```
-
-### 2.6 node_set_node_property
-Set node property value
-
-**Parameters**:
-- `uuid` (string, required): Node UUID
-- `property` (string, required): Property name (e.g., position, rotation, scale, active)
-- `value` (any, required): Property value
-
-**Example**:
-```json
-{
-  "tool": "node_set_node_property",
+  "tool": "node_node_property_management",
   "arguments": {
-    "uuid": "node-uuid-here",
-    "property": "position",
-    "value": {"x": 100, "y": 200, "z": 0}
+    "action": "reset_property",
+    "uuid": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
   }
 }
 ```
 
-### 2.7 node_delete_node
-Delete a node from the scene
+### 2.7 `node_node_array_management`
 
-**Parameters**:
-- `uuid` (string, required): UUID of the node to delete
+- Purpose: ARRAY MANAGEMENT
+- actions: `move_element`, `remove_element`
+- key params: `action`, `uuid`, `path`
+- Minimal call example:
 
-**Example**:
 ```json
 {
-  "tool": "node_delete_node",
+  "tool": "node_node_array_management",
   "arguments": {
-    "uuid": "node-uuid-here"
+    "action": "move_element",
+    "uuid": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "path": "db://assets/example"
   }
 }
 ```
 
-### 2.8 node_move_node
-Move a node to a new parent
+### 2.8 `node_node_script_management`
 
-**Parameters**:
-- `nodeUuid` (string, required): UUID of the node to move
-- `newParentUuid` (string, required): New parent node UUID
-- `siblingIndex` (number, optional): Sibling index in the new parent, defaults to -1
+- Purpose: NODE SCRIPT MANAGEMENT
+- actions: `attach`, `remove`
+- key params: `action`, `nodeUuid`
+- Minimal call example:
 
-**Example**:
 ```json
 {
-  "tool": "node_move_node",
+  "tool": "node_node_script_management",
   "arguments": {
-    "nodeUuid": "node-uuid-here",
-    "newParentUuid": "parent-uuid-here",
-    "siblingIndex": 0
+    "action": "attach",
+    "nodeUuid": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
   }
 }
 ```
 
-### 2.9 node_duplicate_node
-Duplicate a node
+## 3. Component Tools (4)
 
-**Parameters**:
-- `uuid` (string, required): UUID of the node to duplicate
-- `includeChildren` (boolean, optional): Whether to include child nodes, defaults to true
+### 3.1 `component_component_manage`
 
-**Example**:
+- Purpose: COMPONENT MANAGEMENT
+- actions: `add`, `remove`
+- key params: `action`, `nodeUuid`, `componentType`
+- Minimal call example:
+
 ```json
 {
-  "tool": "node_duplicate_node",
+  "tool": "component_component_manage",
   "arguments": {
-    "uuid": "node-uuid-here",
-    "includeChildren": true
+    "action": "add",
+    "nodeUuid": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "componentType": "example"
   }
 }
 ```
 
----
+### 3.2 `component_component_query`
 
-## 3. Component Management Tools
+- Purpose: COMPONENT QUERY
+- actions: `list`, `info`, `available_types`
+- key params: `action`, `nodeUuid`, `category`
+- Minimal call example:
 
-### 3.1 component_add_component
-Add a component to a specific node
-
-**Parameters**:
-- `nodeUuid` (string, **required**): Target node UUID. **Important**: You must specify the exact node to add the component to. Use `get_all_nodes` or `find_node_by_name` to get the UUID of the desired node.
-- `componentType` (string, required): Component type (e.g., cc.Sprite, cc.Label, cc.Button)
-
-**Important Note**: Before adding a component, ensure:
-1. First use `node_get_all_nodes` or `node_find_node_by_name` to find the target node's UUID
-2. Verify the node exists and the UUID is correct
-3. Choose the appropriate component type
-
-**Example**:
 ```json
 {
-  "tool": "component_add_component",
+  "tool": "component_component_query",
   "arguments": {
-    "nodeUuid": "node-uuid-here",
-    "componentType": "cc.Sprite"
+    "action": "list"
   }
 }
 ```
 
-### 3.2 component_remove_component
-Remove a component from a node
+### 3.3 `component_set_component_property`
 
-**Parameters**:
-- `nodeUuid` (string, required): Node UUID
-- `componentType` (string, required): Component type to remove
+- Purpose: COMPONENT PROPERTY SETTER
+- actions: `(none)`
+- key params: `nodeUuid`, `componentType`
+- Minimal call example:
 
-**Example**:
-```json
-{
-  "tool": "component_remove_component",
-  "arguments": {
-    "nodeUuid": "node-uuid-here",
-    "componentType": "cc.Sprite"
-  }
-}
-```
-
-### 3.3 component_get_components
-Get all components of a node
-
-**Parameters**:
-- `nodeUuid` (string, required): Node UUID
-
-**Example**:
-```json
-{
-  "tool": "component_get_components",
-  "arguments": {
-    "nodeUuid": "node-uuid-here"
-  }
-}
-```
-
-### 3.4 component_get_component_info
-Get specific component information
-
-**Parameters**:
-- `nodeUuid` (string, required): Node UUID
-- `componentType` (string, required): Component type to get info for
-
-**Example**:
-```json
-{
-  "tool": "component_get_component_info",
-  "arguments": {
-    "nodeUuid": "node-uuid-here",
-    "componentType": "cc.Sprite"
-  }
-}
-```
-
-### 3.5 component_set_component_property
-Set component property value
-
-**Parameters**:
-- `nodeUuid` (string, required): Node UUID
-- `componentType` (string, required): Component type
-- `property` (string, required): Property name
-- `value` (any, required): Property value
-
-**Example**:
 ```json
 {
   "tool": "component_set_component_property",
   "arguments": {
-    "nodeUuid": "node-uuid-here",
-    "componentType": "cc.Sprite",
-    "property": "spriteFrame",
-    "value": "sprite-frame-uuid"
+    "nodeUuid": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "componentType": "example"
   }
 }
 ```
 
-### 3.6 component_attach_script
-Attach a script component to a node
+### 3.4 `component_configure_click_event`
 
-**Parameters**:
-- `nodeUuid` (string, required): Node UUID
-- `scriptPath` (string, required): Script asset path
+- Purpose: Configure or remove click events for Button components.
+- actions: `(none)`
+- key params: `nodeUuid`
+- Minimal call example:
 
-**Example**:
 ```json
 {
-  "tool": "component_attach_script",
+  "tool": "component_configure_click_event",
   "arguments": {
-    "nodeUuid": "node-uuid-here",
-    "scriptPath": "db://assets/scripts/PlayerController.ts"
+    "nodeUuid": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
   }
 }
 ```
 
-### 3.7 component_get_available_components
-Get list of available component types
+## 4. Prefab Tools (4)
 
-**Parameters**:
-- `category` (string, optional): Component category filter, options: `all`, `renderer`, `ui`, `physics`, `animation`, `audio`, defaults to `all`
+### 4.1 `prefab_prefab_browse`
 
-**Example**:
+- Purpose: PREFAB BROWSER
+- actions: `list`, `info`, `validate`
+- key params: `action`
+- Minimal call example:
+
 ```json
 {
-  "tool": "component_get_available_components",
+  "tool": "prefab_prefab_browse",
   "arguments": {
-    "category": "ui"
+    "action": "list"
   }
 }
 ```
 
----
+### 4.2 `prefab_prefab_lifecycle`
 
-## 4. Prefab Tools
+- Purpose: PREFAB LIFECYCLE
+- actions: `create`, `delete`
+- key params: `action`, `nodeUuid`
+- Minimal call example:
 
-**⚠️ Known Issue**: When using standard Cocos Creator API for prefab instantiation, complex prefabs with child nodes may not be properly restored. While prefab creation functionality can correctly save all child node information, the instantiation process through `create-node` with `assetUuid` has limitations that may result in missing child nodes in the instantiated prefab.
-
-### 4.1 prefab_get_prefab_list
-Get all prefabs in the project
-
-**Parameters**:
-- `folder` (string, optional): Search folder path, defaults to `db://assets`
-
-**Example**:
 ```json
 {
-  "tool": "prefab_get_prefab_list",
+  "tool": "prefab_prefab_lifecycle",
   "arguments": {
-    "folder": "db://assets/prefabs"
+    "action": "create"
   }
 }
 ```
 
-### 4.2 prefab_load_prefab
-Load a prefab by path
+### 4.3 `prefab_prefab_instance`
 
-**Parameters**:
-- `prefabPath` (string, required): Prefab asset path
+- Purpose: PREFAB INSTANCES
+- actions: `instantiate`, `unlink`, `apply`, `revert`
+- key params: `action`, `nodeUuid`
+- Minimal call example:
 
-**Example**:
 ```json
 {
-  "tool": "prefab_load_prefab",
+  "tool": "prefab_prefab_instance",
   "arguments": {
-    "prefabPath": "db://assets/prefabs/Enemy.prefab"
+    "action": "instantiate"
   }
 }
 ```
 
-### 4.3 prefab_instantiate_prefab
-Instantiate a prefab in the scene
+### 4.4 `prefab_prefab_edit`
 
-**Parameters**:
-- `prefabPath` (string, required): Prefab asset path
-- `parentUuid` (string, optional): Parent node UUID
-- `position` (object, optional): Initial position with x, y, z properties
+- Purpose: PREFAB EDIT WORKFLOW
+- actions: `enter`, `save`, `exit`, `test`
+- key params: `action`, `prefabPath`
+- Minimal call example:
 
-**Example**:
 ```json
 {
-  "tool": "prefab_instantiate_prefab",
+  "tool": "prefab_prefab_edit",
   "arguments": {
-    "prefabPath": "db://assets/prefabs/Enemy.prefab",
-    "parentUuid": "parent-uuid-here",
-    "position": {"x": 100, "y": 200, "z": 0}
+    "action": "enter",
+    "prefabPath": "db://assets/example"
   }
 }
 ```
 
-**⚠️ Functionality Limitation**: Complex prefabs with child nodes may not instantiate correctly. Due to Cocos Creator API limitations in the standard `create-node` method using `assetUuid`, only the root node may be created, and child nodes may be lost. This is a known issue with the current implementation.
+## 5. Project Tools (2)
 
-### 4.4 prefab_create_prefab
-Create a prefab from a node
+### 5.1 `project_project_manage`
 
-**Parameters**:
-- `nodeUuid` (string, required): Source node UUID
-- `savePath` (string, required): Path to save the prefab
-- `prefabName` (string, required): Prefab name
+- Purpose: PROJECT MANAGEMENT
+- actions: `run`, `build`, `get_info`, `get_settings`
+- key params: `action`, `category`
+- Minimal call example:
 
-**Example**:
 ```json
 {
-  "tool": "prefab_create_prefab",
+  "tool": "project_project_manage",
   "arguments": {
-    "nodeUuid": "node-uuid-here",
-    "savePath": "db://assets/prefabs/",
-    "prefabName": "MyPrefab"
+    "action": "run"
   }
 }
 ```
 
-### 4.5 prefab_create_prefab_from_node
-Create a prefab from a node (alias for create_prefab)
+### 5.2 `project_project_build_system`
 
-**Parameters**:
-- `nodeUuid` (string, required): Source node UUID
-- `prefabPath` (string, required): Path to save the prefab
+- Purpose: BUILD SYSTEM
+- actions: `get_build_settings`, `open_build_panel`, `check_builder_status`, `start_preview_server`, `stop_preview_server`
+- key params: `action`
+- Minimal call example:
 
-**Example**:
 ```json
 {
-  "tool": "prefab_create_prefab_from_node",
+  "tool": "project_project_build_system",
   "arguments": {
-    "nodeUuid": "node-uuid-here",
-    "prefabPath": "db://assets/prefabs/MyPrefab.prefab"
+    "action": "get_build_settings"
   }
 }
 ```
 
-### 4.6 prefab_update_prefab
-Update an existing prefab
+## 6. Debug Tools (3)
 
-**Parameters**:
-- `prefabPath` (string, required): Prefab asset path
-- `nodeUuid` (string, required): Node UUID containing changes
+### 6.1 `debug_debug_console`
 
-**Example**:
+- Purpose: CONSOLE MANAGEMENT
+- actions: `get_logs`, `clear`
+- key params: `action`
+- Minimal call example:
+
 ```json
 {
-  "tool": "prefab_update_prefab",
+  "tool": "debug_debug_console",
   "arguments": {
-    "prefabPath": "db://assets/prefabs/Enemy.prefab",
-    "nodeUuid": "node-uuid-here"
+    "action": "get_logs"
   }
 }
 ```
 
-### 4.7 prefab_revert_prefab
-Revert a prefab instance to its original state
+### 6.2 `debug_debug_logs`
 
-**Parameters**:
-- `nodeUuid` (string, required): Prefab instance node UUID
+- Purpose: PROJECT LOG ANALYSIS
+- actions: `read`, `search`, `info`
+- key params: `action`
+- Minimal call example:
 
-**Example**:
 ```json
 {
-  "tool": "prefab_revert_prefab",
+  "tool": "debug_debug_logs",
   "arguments": {
-    "nodeUuid": "prefab-instance-uuid-here"
+    "action": "read"
   }
 }
 ```
 
-### 4.8 prefab_get_prefab_info
-Get detailed prefab information
+### 6.3 `debug_debug_system`
 
-**Parameters**:
-- `prefabPath` (string, required): Prefab asset path
+- Purpose: SYSTEM INFORMATION
+- actions: `editor_info`, `performance`
+- key params: `action`
+- Minimal call example:
 
-**Example**:
 ```json
 {
-  "tool": "prefab_get_prefab_info",
+  "tool": "debug_debug_system",
   "arguments": {
-    "prefabPath": "db://assets/prefabs/Enemy.prefab"
+    "action": "editor_info"
   }
 }
 ```
 
----
+## 7. Preferences Tools (3)
 
-## 5. Project Control Tools
+### 7.1 `preferences_preferences_manage`
 
-### 5.1 project_run_project
-Run the project in preview mode
+- Purpose: PREFERENCES MANAGEMENT
+- actions: `open_panel`, `get_config`, `set_config`, `reset_config`
+- key params: `action`, `path`, `category`
+- Minimal call example:
 
-**Parameters**:
-- `platform` (string, optional): Target platform, options: `browser`, `simulator`, `preview`, defaults to `browser`
-
-**Example**:
 ```json
 {
-  "tool": "project_run_project",
+  "tool": "preferences_preferences_manage",
   "arguments": {
-    "platform": "browser"
+    "action": "open_panel"
   }
 }
 ```
 
-### 5.2 project_build_project
-Build the project
+### 7.2 `preferences_preferences_query`
 
-**Parameters**:
-- `platform` (string, required): Build platform, options: `web-mobile`, `web-desktop`, `ios`, `android`, `windows`, `mac`
-- `debug` (boolean, optional): Whether to build in debug mode, defaults to true
+- Purpose: PREFERENCES QUERY
+- actions: `get_all`, `list_categories`, `search_settings`
+- key params: `action`
+- Minimal call example:
 
-**Example**:
 ```json
 {
-  "tool": "project_build_project",
+  "tool": "preferences_preferences_query",
   "arguments": {
-    "platform": "web-mobile",
-    "debug": false
+    "action": "get_all"
   }
 }
 ```
 
-### 5.3 project_get_project_info
-Get project information
+### 7.3 `preferences_preferences_backup`
 
-**Parameters**: None
+- Purpose: PREFERENCES BACKUP
+- actions: `export`, `validate_backup`
+- key params: `action`
+- Minimal call example:
 
-**Example**:
 ```json
 {
-  "tool": "project_get_project_info",
-  "arguments": {}
-}
-```
-
-### 5.4 project_get_project_settings
-Get project settings
-
-**Parameters**:
-- `category` (string, optional): Settings category, options: `general`, `physics`, `render`, `assets`, defaults to `general`
-
-**Example**:
-```json
-{
-  "tool": "project_get_project_settings",
+  "tool": "preferences_preferences_backup",
   "arguments": {
-    "category": "physics"
+    "action": "export"
   }
 }
 ```
 
-### 5.5 project_refresh_assets
-Refresh the asset database
+## 8. Server Tools (2)
 
-**Parameters**:
-- `folder` (string, optional): Specific folder to refresh
+### 8.1 `server_server_information`
 
-**Example**:
+- Purpose: SERVER INFORMATION
+- actions: `get_ip_list`, `get_sorted_ip_list`, `get_port`, `get_comprehensive_status`
+- key params: `action`
+- Minimal call example:
+
 ```json
 {
-  "tool": "project_refresh_assets",
+  "tool": "server_server_information",
   "arguments": {
-    "folder": "db://assets/textures"
+    "action": "get_ip_list"
   }
 }
 ```
 
-### 5.6 project_import_asset
-Import an asset file
+### 8.2 `server_server_connectivity`
 
-**Parameters**:
-- `sourcePath` (string, required): Source file path
-- `targetFolder` (string, required): Target folder in assets
+- Purpose: SERVER CONNECTIVITY
+- actions: `test_connectivity`, `get_network_interfaces`
+- key params: `action`
+- Minimal call example:
 
-**Example**:
 ```json
 {
-  "tool": "project_import_asset",
+  "tool": "server_server_connectivity",
   "arguments": {
-    "sourcePath": "/path/to/image.png",
-    "targetFolder": "db://assets/textures"
+    "action": "test_connectivity"
   }
 }
 ```
 
-### 5.7 project_get_asset_info
-Get asset information
+## 9. Broadcast Tools (2)
 
-**Parameters**:
-- `assetPath` (string, required): Asset path
+### 9.1 `broadcast_broadcast_log_management`
 
-**Example**:
+- Purpose: BROADCAST LOG MANAGEMENT
+- actions: `get_log`, `clear_log`
+- key params: `action`
+- Minimal call example:
+
 ```json
 {
-  "tool": "project_get_asset_info",
+  "tool": "broadcast_broadcast_log_management",
   "arguments": {
-    "assetPath": "db://assets/textures/player.png"
+    "action": "get_log"
   }
 }
 ```
 
-### 5.8 project_get_assets
-Get assets by type
+### 9.2 `broadcast_broadcast_listener_management`
 
-**Parameters**:
-- `type` (string, optional): Asset type filter, options: `all`, `scene`, `prefab`, `script`, `texture`, `material`, `mesh`, `audio`, `animation`, defaults to `all`
-- `folder` (string, optional): Search folder, defaults to `db://assets`
+- Purpose: BROADCAST LISTENER MANAGEMENT
+- actions: `start_listening`, `stop_listening`, `get_active_listeners`
+- key params: `action`
+- Minimal call example:
 
-**Example**:
 ```json
 {
-  "tool": "project_get_assets",
+  "tool": "broadcast_broadcast_listener_management",
   "arguments": {
-    "type": "texture",
-    "folder": "db://assets/textures"
+    "action": "start_listening"
   }
 }
 ```
 
-### 5.9 project_get_build_settings
-Get build settings
+## 10. Scene View Tools (5)
 
-**Parameters**: None
+### 10.1 `sceneView_scene_view_gizmo_management`
 
-**Example**:
+- Purpose: GIZMO MANAGEMENT
+- actions: `change_tool`, `query_tool`, `change_pivot`, `query_pivot`, `change_coordinate`, `query_coordinate`, `query_view_mode`
+- key params: `action`
+- Minimal call example:
+
 ```json
 {
-  "tool": "project_get_build_settings",
-  "arguments": {}
-}
-```
-
-### 5.10 project_open_build_panel
-Open the build panel in the editor
-
-**Parameters**: None
-
-**Example**:
-```json
-{
-  "tool": "project_open_build_panel",
-  "arguments": {}
-}
-```
-
-### 5.11 project_check_builder_status
-Check if the builder worker process is ready
-
-**Parameters**: None
-
-**Example**:
-```json
-{
-  "tool": "project_check_builder_status",
-  "arguments": {}
-}
-```
-
-### 5.12 project_start_preview_server
-Start the preview server
-
-**Parameters**:
-- `port` (number, optional): Preview server port, defaults to 7456
-
-**Example**:
-```json
-{
-  "tool": "project_start_preview_server",
+  "tool": "sceneView_scene_view_gizmo_management",
   "arguments": {
-    "port": 8080
+    "action": "change_tool"
   }
 }
 ```
 
-### 5.13 project_stop_preview_server
-Stop the preview server
+### 10.2 `sceneView_scene_view_mode_control`
 
-**Parameters**: None
+- Purpose: VIEW MODE CONTROL
+- actions: `change_2d_3d`, `query_2d_3d`, `set_grid`, `query_grid`
+- key params: `action`
+- Minimal call example:
 
-**Example**:
 ```json
 {
-  "tool": "project_stop_preview_server",
-  "arguments": {}
-}
-```
-
-### 5.14 project_create_asset
-Create a new asset file or folder
-
-**Parameters**:
-- `url` (string, required): Asset URL
-- `content` (string, optional): File content, null means create folder
-- `overwrite` (boolean, optional): Whether to overwrite existing file, defaults to false
-
-**Example**:
-```json
-{
-  "tool": "project_create_asset",
+  "tool": "sceneView_scene_view_mode_control",
   "arguments": {
-    "url": "db://assets/scripts/NewScript.ts",
-    "content": "// New TypeScript script\n",
-    "overwrite": false
+    "action": "change_2d_3d"
   }
 }
 ```
 
-### 5.15 project_copy_asset
-Copy an asset to another location
+### 10.3 `sceneView_scene_view_icon_gizmo`
 
-**Parameters**:
-- `source` (string, required): Source asset URL
-- `target` (string, required): Target location URL
-- `overwrite` (boolean, optional): Whether to overwrite existing file, defaults to false
+- Purpose: ICON GIZMO CONTROL
+- actions: `set_3d_mode`, `query_3d_mode`, `set_size`, `query_size`
+- key params: `action`
+- Minimal call example:
 
-**Example**:
 ```json
 {
-  "tool": "project_copy_asset",
+  "tool": "sceneView_scene_view_icon_gizmo",
   "arguments": {
-    "source": "db://assets/textures/player.png",
-    "target": "db://assets/textures/backup/player.png",
-    "overwrite": false
+    "action": "set_3d_mode"
   }
 }
 ```
 
-### 5.16 project_move_asset
-Move an asset to another location
+### 10.4 `sceneView_scene_view_camera_control`
 
-**Parameters**:
-- `source` (string, required): Source asset URL
-- `target` (string, required): Target location URL
-- `overwrite` (boolean, optional): Whether to overwrite existing file, defaults to false
+- Purpose: CAMERA CONTROL
+- actions: `focus_on_nodes`, `align_camera_with_view`, `align_view_with_node`
+- key params: `action`
+- Minimal call example:
 
-**Example**:
 ```json
 {
-  "tool": "project_move_asset",
+  "tool": "sceneView_scene_view_camera_control",
   "arguments": {
-    "source": "db://assets/textures/old_player.png",
-    "target": "db://assets/textures/player.png",
-    "overwrite": true
+    "action": "focus_on_nodes"
   }
 }
 ```
 
-### 5.17 project_delete_asset
-Delete an asset
+### 10.5 `sceneView_scene_view_status_management`
 
-**Parameters**:
-- `url` (string, required): Asset URL to delete
+- Purpose: STATUS MANAGEMENT
+- actions: `get_status`, `reset_view`
+- key params: `action`
+- Minimal call example:
 
-**Example**:
 ```json
 {
-  "tool": "project_delete_asset",
+  "tool": "sceneView_scene_view_status_management",
   "arguments": {
-    "url": "db://assets/textures/unused.png"
+    "action": "get_status"
   }
 }
 ```
 
-### 5.18 project_save_asset
-Save asset content
+## 11. Reference Image Tools (4)
 
-**Parameters**:
-- `url` (string, required): Asset URL
-- `content` (string, required): Asset content
+### 11.1 `referenceImage_reference_image_management`
 
-**Example**:
+- Purpose: REFERENCE IMAGE MANAGEMENT
+- actions: `add`, `remove`, `switch`, `clear_all`
+- key params: `action`, `path`
+- Minimal call example:
+
 ```json
 {
-  "tool": "project_save_asset",
+  "tool": "referenceImage_reference_image_management",
   "arguments": {
-    "url": "db://assets/scripts/GameManager.ts",
-    "content": "// Updated script content\n"
+    "action": "add"
   }
 }
 ```
 
-### 5.19 project_reimport_asset
-Reimport an asset
+### 11.2 `referenceImage_reference_image_query`
 
-**Parameters**:
-- `url` (string, required): Asset URL to reimport
+- Purpose: REFERENCE IMAGE QUERY
+- actions: `get_config`, `get_current`, `list_all`
+- key params: `action`
+- Minimal call example:
 
-**Example**:
 ```json
 {
-  "tool": "project_reimport_asset",
+  "tool": "referenceImage_reference_image_query",
   "arguments": {
-    "url": "db://assets/textures/player.png"
+    "action": "get_config"
   }
 }
 ```
 
-### 5.20 project_query_asset_path
-Get asset disk path
+### 11.3 `referenceImage_reference_image_transform`
 
-**Parameters**:
-- `url` (string, required): Asset URL
+- Purpose: REFERENCE IMAGE TRANSFORM
+- actions: `set_position`, `set_scale`, `set_opacity`, `set_data`
+- key params: `action`
+- Minimal call example:
 
-**Example**:
 ```json
 {
-  "tool": "project_query_asset_path",
+  "tool": "referenceImage_reference_image_transform",
   "arguments": {
-    "url": "db://assets/textures/player.png"
+    "action": "set_position"
   }
 }
 ```
 
-### 5.21 project_query_asset_uuid
-Get asset UUID from URL
+### 11.4 `referenceImage_reference_image_display`
 
-**Parameters**:
-- `url` (string, required): Asset URL
+- Purpose: REFERENCE IMAGE DISPLAY
+- actions: `refresh`
+- key params: `action`
+- Minimal call example:
 
-**Example**:
 ```json
 {
-  "tool": "project_query_asset_uuid",
+  "tool": "referenceImage_reference_image_display",
   "arguments": {
-    "url": "db://assets/textures/player.png"
+    "action": "refresh"
   }
 }
 ```
 
-### 5.22 project_query_asset_url
-Get asset URL from UUID
+## 12. Asset Advanced Tools (5)
 
-**Parameters**:
-- `uuid` (string, required): Asset UUID
+### 12.1 `assetAdvanced_asset_manage`
 
-**Example**:
+- Purpose: ASSET MANAGEMENT
+- actions: `import`, `delete`, `save_meta`, `generate_url`
+- key params: `action`
+- Minimal call example:
+
 ```json
 {
-  "tool": "project_query_asset_url",
+  "tool": "assetAdvanced_asset_manage",
   "arguments": {
-    "uuid": "asset-uuid-here"
+    "action": "import"
   }
 }
 ```
 
----
+### 12.2 `assetAdvanced_asset_analyze`
 
-## 6. Debug Tools
+- Purpose: ASSET ANALYSIS
+- actions: `dependencies`, `manifest`
+- key params: `action`
+- Minimal call example:
 
-### 6.1 debug_get_console_logs
-Get editor console logs
-
-**Parameters**:
-- `limit` (number, optional): Number of latest logs to retrieve, defaults to 100
-- `filter` (string, optional): Filter logs by type, options: `all`, `log`, `warn`, `error`, `info`, defaults to `all`
-
-**Example**:
 ```json
 {
-  "tool": "debug_get_console_logs",
+  "tool": "assetAdvanced_asset_analyze",
   "arguments": {
-    "limit": 50,
-    "filter": "error"
+    "action": "dependencies"
   }
 }
 ```
 
-### 6.2 debug_clear_console
-Clear the editor console
+### 12.3 `assetAdvanced_asset_system`
 
-**Parameters**: None
+- Purpose: ASSET SYSTEM
+- actions: `check_ready`, `open_external`, `refresh`
+- key params: `action`
+- Minimal call example:
 
-**Example**:
 ```json
 {
-  "tool": "debug_clear_console",
-  "arguments": {}
-}
-```
-
-### 6.3 debug_execute_script
-Execute JavaScript code in scene context
-
-**Parameters**:
-- `script` (string, required): JavaScript code to execute
-
-**Example**:
-```json
-{
-  "tool": "debug_execute_script",
+  "tool": "assetAdvanced_asset_system",
   "arguments": {
-    "script": "console.log('Hello from MCP!');"
+    "action": "check_ready"
   }
 }
 ```
 
-### 6.4 debug_get_node_tree
-Get detailed node tree for debugging
+### 12.4 `assetAdvanced_asset_query`
 
-**Parameters**:
-- `rootUuid` (string, optional): Root node UUID, if not provided uses scene root node
-- `maxDepth` (number, optional): Maximum tree depth, defaults to 10
+- Purpose: ASSET QUERY
+- actions: `get_info`, `get_assets`, `find_by_name`, `get_details`, `query_path`, `query_uuid`, `query_url`
+- key params: `action`, `uuid`
+- Minimal call example:
 
-**Example**:
 ```json
 {
-  "tool": "debug_get_node_tree",
+  "tool": "assetAdvanced_asset_query",
   "arguments": {
-    "rootUuid": "root-node-uuid",
-    "maxDepth": 5
+    "action": "get_info"
   }
 }
 ```
 
-### 6.5 debug_get_performance_stats
-Get performance statistics
+### 12.5 `assetAdvanced_asset_operations`
 
-**Parameters**: None
+- Purpose: ASSET OPERATIONS
+- actions: `create`, `copy`, `move`, `delete`, `save`, `reimport`, `import`
+- key params: `action`
+- Minimal call example:
 
-**Example**:
 ```json
 {
-  "tool": "debug_get_performance_stats",
-  "arguments": {}
-}
-```
-
-### 6.6 debug_validate_scene
-Validate if the current scene has issues
-
-**Parameters**:
-- `checkMissingAssets` (boolean, optional): Check for missing asset references, defaults to true
-- `checkPerformance` (boolean, optional): Check for performance issues, defaults to true
-
-**Example**:
-```json
-{
-  "tool": "debug_validate_scene",
+  "tool": "assetAdvanced_asset_operations",
   "arguments": {
-    "checkMissingAssets": true,
-    "checkPerformance": true
+    "action": "create"
   }
 }
 ```
 
-### 6.7 debug_get_editor_info
-Get editor and environment information
+## 13. Validation Tools (3)
 
-**Parameters**: None
+### 13.1 `validation_validate_json_params`
 
-**Example**:
+- Purpose: JSON PARAMETER VALIDATION
+- actions: `(none)`
+- key params: `jsonString`
+- Minimal call example:
+
 ```json
 {
-  "tool": "debug_get_editor_info",
-  "arguments": {}
-}
-```
-
-### 6.8 debug_get_project_logs
-Get project logs from temp/logs/project.log file
-
-**Parameters**:
-- `lines` (number, optional): Number of lines to read from the end of the log file, default is 100, range: 1-10000
-- `filterKeyword` (string, optional): Filter logs by specific keyword
-- `logLevel` (string, optional): Filter by log level, options: `ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`, `ALL`, defaults to `ALL`
-
-**Example**:
-```json
-{
-  "tool": "debug_get_project_logs",
+  "tool": "validation_validate_json_params",
   "arguments": {
-    "lines": 200,
-    "filterKeyword": "prefab",
-    "logLevel": "INFO"
+    "jsonString": "example"
   }
 }
 ```
 
-### 6.9 debug_get_log_file_info
-Get project log file information
+### 13.2 `validation_safe_string_value`
 
-**Parameters**: None
+- Purpose: STRING SAFETY
+- actions: `(none)`
+- key params: `value`
+- Minimal call example:
 
-**Returns**: File size, last modified time, line count, and file path information
-
-**Example**:
 ```json
 {
-  "tool": "debug_get_log_file_info",
-  "arguments": {}
-}
-```
-
-### 6.10 debug_search_project_logs
-Search for specific patterns or errors in project logs
-
-**Parameters**:
-- `pattern` (string, required): Search pattern (supports regex)
-- `maxResults` (number, optional): Maximum number of matching results, defaults to 20, range: 1-100
-- `contextLines` (number, optional): Number of context lines to show around each match, defaults to 2, range: 0-10
-
-**Example**:
-```json
-{
-  "tool": "debug_search_project_logs",
+  "tool": "validation_safe_string_value",
   "arguments": {
-    "pattern": "error|failed|exception",
-    "maxResults": 10,
-    "contextLines": 3
+    "value": "example"
   }
 }
 ```
 
----
+### 13.3 `validation_format_mcp_request`
 
-## 7. Preferences Tools
+- Purpose: MCP REQUEST FORMATTING
+- actions: `(none)`
+- key params: `toolName`, `arguments`
+- Minimal call example:
 
-### 7.1 preferences_get_preferences
-Get editor preferences
-
-**Parameters**:
-- `key` (string, optional): Specific preference key to get
-
-**Example**:
 ```json
 {
-  "tool": "preferences_get_preferences",
+  "tool": "validation_format_mcp_request",
   "arguments": {
-    "key": "editor.theme"
+    "toolName": "example-name",
+    "arguments": {}
   }
 }
 ```
 
-### 7.2 preferences_set_preferences
-Set editor preferences
-
-**Parameters**:
-- `key` (string, required): Preference key to set
-- `value` (any, required): Preference value to set
-
-**Example**:
-```json
-{
-  "tool": "preferences_set_preferences",
-  "arguments": {
-    "key": "editor.theme",
-    "value": "dark"
-  }
-}
-```
-
-### 7.3 preferences_get_global_preferences
-Get global editor preferences
-
-**Parameters**:
-- `key` (string, optional): Global preference key to get
-
-**Example**:
-```json
-{
-  "tool": "preferences_get_global_preferences",
-  "arguments": {
-    "key": "global.autoSave"
-  }
-}
-```
-
-### 7.4 preferences_set_global_preferences
-Set global editor preferences
-
-**Parameters**:
-- `key` (string, required): Global preference key to set
-- `value` (any, required): Global preference value to set
-
-**Example**:
-```json
-{
-  "tool": "preferences_set_global_preferences",
-  "arguments": {
-    "key": "global.autoSave",
-    "value": true
-  }
-}
-```
-
-### 7.5 preferences_get_recent_projects
-Get recently opened projects
-
-**Parameters**: None
-
-**Example**:
-```json
-{
-  "tool": "preferences_get_recent_projects",
-  "arguments": {}
-}
-```
-
-### 7.6 preferences_clear_recent_projects
-Clear the list of recently opened projects
-
-**Parameters**: None
-
-**Example**:
-```json
-{
-  "tool": "preferences_clear_recent_projects",
-  "arguments": {}
-}
-```
-
----
-
-## 8. Server Tools
-
-### 8.1 server_get_server_info
-Get server information
-
-**Parameters**: None
-
-**Example**:
-```json
-{
-  "tool": "server_get_server_info",
-  "arguments": {}
-}
-```
-
-### 8.2 server_broadcast_custom_message
-Broadcast a custom message
-
-**Parameters**:
-- `message` (string, required): Message name
-- `data` (any, optional): Message data
-
-**Example**:
-```json
-{
-  "tool": "server_broadcast_custom_message",
-  "arguments": {
-    "message": "custom_event",
-    "data": {"type": "test", "value": 123}
-  }
-}
-```
-
-### 8.3 server_get_editor_version
-Get editor version information
-
-**Parameters**: None
-
-**Example**:
-```json
-{
-  "tool": "server_get_editor_version",
-  "arguments": {}
-}
-```
-
-### 8.4 server_get_project_name
-Get current project name
-
-**Parameters**: None
-
-**Example**:
-```json
-{
-  "tool": "server_get_project_name",
-  "arguments": {}
-}
-```
-
-### 8.5 server_get_project_path
-Get current project path
-
-**Parameters**: None
-
-**Example**:
-```json
-{
-  "tool": "server_get_project_path",
-  "arguments": {}
-}
-```
-
-### 8.6 server_get_project_uuid
-Get current project UUID
-
-**Parameters**: None
-
-**Example**:
-```json
-{
-  "tool": "server_get_project_uuid",
-  "arguments": {}
-}
-```
-
-### 8.7 server_restart_editor
-Request to restart the editor
-
-**Parameters**: None
-
-**Example**:
-```json
-{
-  "tool": "server_restart_editor",
-  "arguments": {}
-}
-```
-
-### 8.8 server_quit_editor
-Request to quit the editor
-
-**Parameters**: None
-
-**Example**:
-```json
-{
-  "tool": "server_quit_editor",
-  "arguments": {}
-}
-```
-
----
-
-## 9. Broadcast Tools
-
-### 9.1 broadcast_get_broadcast_log
-Get recent broadcast message log
-
-**Parameters**:
-- `limit` (number, optional): Number of latest messages to return, defaults to 50
-- `messageType` (string, optional): Filter by message type
-
-**Example**:
-```json
-{
-  "tool": "broadcast_get_broadcast_log",
-  "arguments": {
-    "limit": 100,
-    "messageType": "scene_change"
-  }
-}
-```
-
-### 9.2 broadcast_listen_broadcast
-Start listening for specific broadcast messages
-
-**Parameters**:
-- `messageType` (string, required): Message type to listen for
-
-**Example**:
-```json
-{
-  "tool": "broadcast_listen_broadcast",
-  "arguments": {
-    "messageType": "node_created"
-  }
-}
-```
-
-### 9.3 broadcast_stop_listening
-Stop listening for specific broadcast messages
-
-**Parameters**:
-- `messageType` (string, required): Message type to stop listening for
-
-**Example**:
-```json
-{
-  "tool": "broadcast_stop_listening",
-  "arguments": {
-    "messageType": "node_created"
-  }
-}
-```
-
-### 9.4 broadcast_clear_broadcast_log
-Clear broadcast message log
-
-**Parameters**: None
-
-**Example**:
-```json
-{
-  "tool": "broadcast_clear_broadcast_log",
-  "arguments": {}
-}
-```
-
-### 9.5 broadcast_get_active_listeners
-Get list of active broadcast listeners
-
-**Parameters**: None
-
-**Example**:
-```json
-{
-  "tool": "broadcast_get_active_listeners",
-  "arguments": {}
-}
-```
-
----
-
-## Usage Guidelines
-
-### 1. Tool Call Format
-
-All tool calls use JSON-RPC 2.0 format:
-
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "tools/call",
-  "params": {
-    "name": "tool_name",
-    "arguments": {
-      // Tool parameters
-    }
-  },
-  "id": 1
-}
-```
-
-### 2. Common UUID Retrieval Methods
-
-- Use `node_get_all_nodes` to get all node UUIDs
-- Use `node_find_node_by_name` to find node UUIDs by name
-- Use `scene_get_current_scene` to get scene UUID
-- Use `prefab_get_prefab_list` to get prefab information
-
-### 3. Asset Path Format
-
-Cocos Creator uses `db://` prefixed asset URL format:
-- Scenes: `db://assets/scenes/GameScene.scene`
-- Prefabs: `db://assets/prefabs/Player.prefab`
-- Scripts: `db://assets/scripts/GameManager.ts`
-- Textures: `db://assets/textures/player.png`
-
-### 4. Error Handling
-
-If a tool call fails, an error message will be returned:
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "error": {
-    "code": -32000,
-    "message": "Tool execution failed",
-    "data": {
-      "error": "Detailed error message"
-    }
-  }
-}
-```
-
-### 5. Best Practices
-
-1. **Query First, Then Operate**: Before modifying nodes or components, first use query tools to get current state
-2. **Use UUIDs**: Prefer using UUIDs over names when referencing nodes and assets
-3. **Error Checking**: Always check the return value of tool calls to ensure operations succeed
-4. **Asset Management**: Before deleting or moving assets, ensure they are not referenced elsewhere
-5. **Performance Considerations**: Avoid frequent tool calls in loops, consider batch operations
-
----
-
-## Technical Support
-
-If you encounter issues during use, you can:
-
-1. Use `debug_get_console_logs` to view detailed error logs
-2. Use `debug_validate_scene` to check if the scene has issues
-3. Use `debug_get_editor_info` to get environment information
-4. Check the MCP server's running status and logs
-
----
-
-*This document is based on Cocos Creator MCP Server v1.3.0. Please refer to the latest version documentation for updates.*
+## Compatibility and Deprecation
+
+- Legacy scene-advanced prefixed tools are not exposed and no longer supported.
+- Unprefixed legacy names (for example `create_node`) are out of this guide scope.
+- Source of truth is `getTools()` and `action` enums in `source/tools/*.ts`.

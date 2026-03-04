@@ -4,181 +4,114 @@ export class ComponentTools implements ToolExecutor {
     getTools(): ToolDefinition[] {
         return [
             {
-                name: 'add_component',
-                description: 'Add a component to a specific node. IMPORTANT: You must provide the nodeUuid parameter to specify which node to add the component to.',
+                name: 'component_manage',
+                description: 'COMPONENT MANAGEMENT: Add or remove built-in Cocos Creator components (cc.Sprite, cc.Button, etc.). WORKFLOW: 1) Use node_query to get nodeUuid, 2) Add components with componentType, 3) Use component_query to verify. For custom scripts use node_script_management from node-tools instead.',
                 inputSchema: {
                     type: 'object',
                     properties: {
+                        action: {
+                            type: 'string',
+                            enum: ['add', 'remove'],
+                            description: 'Component operation: "add" = attach built-in component(s) to node (requires componentType) | "remove" = detach specific component from node (requires exact CID from component_query)'
+                        },
                         nodeUuid: {
                             type: 'string',
-                            description: 'Target node UUID. REQUIRED: You must specify the exact node to add the component to. Use get_all_nodes or find_node_by_name to get the UUID of the desired node.'
+                            description: 'Target node UUID (REQUIRED). WORKFLOW: Use node_query tool to find node UUID first. Format: "12345678-abcd-1234-5678-123456789abc". Cannot add/remove components without valid node UUID.'
                         },
                         componentType: {
-                            type: 'string',
-                            description: 'Component type (e.g., cc.Sprite, cc.Label, cc.Button)'
+                            type: ['string', 'array'],
+                            items: { type: 'string' },
+                            description: 'Component type(s) (REQUIRED). ADD: Built-in types like "cc.Sprite", "cc.Button", "cc.Label", "cc.RichText". Can be string or array. REMOVE: Must use exact CID from component_query list (format: "cc.Sprite@12345"). Common types: cc.Sprite (images), cc.Label (text), cc.Button (clickable).'
                         }
                     },
-                    required: ['nodeUuid', 'componentType']
+                    required: ['action', 'nodeUuid', 'componentType']
                 }
             },
             {
-                name: 'remove_component',
-                description: 'Remove a component from a node. componentType must be the component\'s classId (cid, i.e. the type field from getComponents), not the script name or class name. Use getComponents to get the correct cid.',
+                name: 'component_query',
+                description: 'COMPONENT QUERY: Get component information, list all components on node, or get available component types. Use this FIRST to find component CIDs before removing!',
                 inputSchema: {
                     type: 'object',
                     properties: {
+                        action: {
+                            type: 'string',
+                            enum: ['list', 'info', 'available_types'],
+                            description: 'Action: "list" = get all components on node | "info" = get specific component details | "available_types" = get all available component types'
+                        },
                         nodeUuid: {
                             type: 'string',
-                            description: 'Node UUID'
+                            description: 'Node UUID (required for "list" and "info" actions). Get from node tools first!'
                         },
                         componentType: {
                             type: 'string',
-                            description: 'Component cid (type field from getComponents). Do NOT use script name or class name. Example: "cc.Sprite" or "9b4a7ueT9xD6aRE+AlOusy1"'
-                        }
-                    },
-                    required: ['nodeUuid', 'componentType']
-                }
-            },
-            {
-                name: 'get_components',
-                description: 'Get all components of a node',
-                inputSchema: {
-                    type: 'object',
-                    properties: {
-                        nodeUuid: {
-                            type: 'string',
-                            description: 'Node UUID'
-                        }
-                    },
-                    required: ['nodeUuid']
-                }
-            },
-            {
-                name: 'get_component_info',
-                description: 'Get specific component information',
-                inputSchema: {
-                    type: 'object',
-                    properties: {
-                        nodeUuid: {
-                            type: 'string',
-                            description: 'Node UUID'
+                            description: 'Component type to get info for (required for "info" action). Use exact CID from list results.'
                         },
-                        componentType: {
+                        category: {
                             type: 'string',
-                            description: 'Component type to get info for'
+                            enum: ['all', 'renderer', 'ui', 'physics', 'animation', 'audio'],
+                            default: 'all',
+                            description: 'Component category filter for available_types action'
                         }
                     },
-                    required: ['nodeUuid', 'componentType']
+                    required: ['action']
                 }
             },
             {
                 name: 'set_component_property',
-                description: 'Set component property values for UI components or custom script components. Supports setting properties of built-in UI components (e.g., cc.Label, cc.Sprite) and custom script components. Note: For node basic properties (name, active, layer, etc.), use set_node_property. For node transform properties (position, rotation, scale, etc.), use set_node_transform.',
+                description: 'COMPONENT PROPERTY SETTER: Set component properties with strict type validation. CRITICAL WORKFLOW: 1) Use component_query to get exact componentType AND inspect property types, 2) Set properties with MANDATORY propertyType specification, 3) Verify results. SUPPORTS: All Cocos Creator built-in components (cc.Label, cc.Sprite, cc.Button) and custom script components. ⚠️ IMPORTANT: propertyType is REQUIRED - no automatic detection!',
                 inputSchema: {
                     type: 'object',
                     properties: {
                         nodeUuid: {
                             type: 'string',
-                            description: 'Target node UUID - Must specify the node to operate on'
+                            description: 'Target node UUID (REQUIRED). Get from node_query tool first. Format: "12345678-abcd-1234-5678-123456789abc". Must be valid scene node UUID.'
                         },
                         componentType: {
                             type: 'string',
-                            description: 'Component type - Can be built-in components (e.g., cc.Label) or custom script components (e.g., MyScript). If unsure about component type, use get_components first to retrieve all components on the node.',
-                            // 移除enum限制，允许任意组件类型包括自定义脚本
+                            description: 'Component type identifier (REQUIRED). BUILT-IN: "cc.Label", "cc.Sprite", "cc.Button", "cc.UITransform". SCRIPTS: Use compressed UUID format like "3b6be0raOhG54eGN2c5M4cN" (get from component_query). CRITICAL: Use exact type string from component_query list action!'
                         },
+                        // 支持单个属性设置的旧格式（向后兼容）
                         property: {
                             type: 'string',
-                            description: 'Property name - The property to set. Common properties include:\n' +
-                                '• cc.Label: string (text content), fontSize (font size), color (text color)\n' +
-                                '• cc.Sprite: spriteFrame (sprite frame), color (tint color), sizeMode (size mode)\n' +
-                                '• cc.Button: normalColor (normal color), pressedColor (pressed color), target (target node)\n' +
-                                '• cc.UITransform: contentSize (content size), anchorPoint (anchor point)\n' +
-                                '• Custom Scripts: Based on properties defined in the script'
+                            description: 'Property name for single property setting. Examples: "string" (Label text), "fontSize" (Label size), "spriteFrame" (Sprite image), "color" (visual color), "player" (script node reference). Check component_query for available properties.'
                         },
                         propertyType: {
                             type: 'string',
-                            description: 'Property type - Must explicitly specify the property data type for correct value conversion and validation',
+                            description: 'Property data type (REQUIRED for single property setting). Use component_query to inspect the property and determine its exact type. CRITICAL: Must match actual property type exactly or setting will fail! No automatic detection available.',
                             enum: [
                                 'string', 'number', 'boolean', 'integer', 'float',
                                 'color', 'vec2', 'vec3', 'size',
                                 'node', 'component', 'spriteFrame', 'prefab', 'asset',
                                 'nodeArray', 'colorArray', 'numberArray', 'stringArray'
                             ]
-                                                },
-
+                        },
                         value: {
-                            description: 'Property value - Use the corresponding data format based on propertyType:\n\n' +
-                                '📝 Basic Data Types:\n' +
-                                '• string: "Hello World" (text string)\n' +
-                                '• number/integer/float: 42 or 3.14 (numeric value)\n' +
-                                '• boolean: true or false (boolean value)\n\n' +
-                                '🎨 Color Type:\n' +
-                                '• color: {"r":255,"g":0,"b":0,"a":255} (RGBA values, range 0-255)\n' +
-                                '  - Alternative: "#FF0000" (hexadecimal format)\n' +
-                                '  - Transparency: a value controls opacity, 255 = fully opaque, 0 = fully transparent\n\n' +
-                                '📐 Vector and Size Types:\n' +
-                                '• vec2: {"x":100,"y":50} (2D vector)\n' +
-                                '• vec3: {"x":1,"y":2,"z":3} (3D vector)\n' +
-                                '• size: {"width":100,"height":50} (size dimensions)\n\n' +
-                                '🔗 Reference Types (using UUID strings):\n' +
-                                '• node: "target-node-uuid" (node reference)\n' +
-                                '  How to get: Use get_all_nodes or find_node_by_name to get node UUIDs\n' +
-                                '• component: "target-node-uuid" (component reference)\n' +
-                                '  How it works: \n' +
-                                '    1. Provide the UUID of the NODE that contains the target component\n' +
-                                '    2. System auto-detects required component type from property metadata\n' +
-                                '    3. Finds the component on target node and gets its scene __id__\n' +
-                                '    4. Sets reference using the scene __id__ (not node UUID)\n' +
-                                '  Example: value="label-node-uuid" will find cc.Label and use its scene ID\n' +
-                                '• spriteFrame: "spriteframe-uuid" (sprite frame asset)\n' +
-                                '  How to get: Check asset database or use asset browser\n' +
-                                '• prefab: "prefab-uuid" (prefab asset)\n' +
-                                '  How to get: Check asset database or use asset browser\n' +
-                                '• asset: "asset-uuid" (generic asset reference)\n' +
-                                '  How to get: Check asset database or use asset browser\n\n' +
-                                '📋 Array Types:\n' +
-                                '• nodeArray: ["uuid1","uuid2"] (array of node UUIDs)\n' +
-                                '• colorArray: [{"r":255,"g":0,"b":0,"a":255}] (array of colors)\n' +
-                                '• numberArray: [1,2,3,4,5] (array of numbers)\n' +
-                                '• stringArray: ["item1","item2"] (array of strings)'
-                        }
-                    },
-                    required: ['nodeUuid', 'componentType', 'property', 'propertyType', 'value']
-                }
-            },
-            {
-                name: 'set_component_properties',
-                description: 'Batch set multiple component properties in one call. Each item uses the same schema as set_component_property.',
-                inputSchema: {
-                    type: 'object',
-                    properties: {
-                        nodeUuid: {
-                            type: 'string',
-                            description: 'Target node UUID - Must specify the node to operate on'
+                            description: 'Property value - format depends on propertyType. STRING: "Hello World", NUMBER: 42, BOOLEAN: true/false, COLOR: {"r":255,"g":0,"b":0,"a":255} or "#FF0000", VEC2: {"x":100,"y":50}, SIZE: {"width":200,"height":100}, NODE/ASSET: "uuid-string", ARRAYS: [...values]. See examples in properties description.'
                         },
-                        componentType: {
-                            type: 'string',
-                            description: 'Component type - Can be built-in components (e.g., cc.Label) or custom script components (e.g., MyScript). If unsure about component type, use get_components first to retrieve all components on the node.'
-                        },
-                        continueOnError: {
-                            type: 'boolean',
-                            description: 'Whether to continue setting remaining properties when one item fails',
-                            default: true
-                        },
+                        // 新的批量属性设置格式
                         properties: {
-                            type: 'array',
-                            description: 'Properties to set (each item follows the same schema as set_component_property)',
-                            minItems: 1,
-                            items: {
+                            type: 'object',
+                            description: 'BATCH PROPERTY SETTING: Set multiple properties simultaneously for efficiency. Each property MUST specify exact type and value. CRITICAL: Property names must match exactly (case-sensitive), types must be accurate. Use component_query to inspect property types first!\n\n' +
+                                '📝 FORMAT:\n' +
+                                '{\n' +
+                                '  "propertyName": {"type": "exactPropertyType", "value": actualValue}\n' +
+                                '}\n\n' +
+                                '🎯 EXAMPLES BY TYPE:\n' +
+                                '• TEXT: {"string": {"type": "string", "value": "Hello World"}}\n' +
+                                '• NUMBERS: {"fontSize": {"type": "number", "value": 28}}\n' +
+                                '• COLORS: {"color": {"type": "color", "value": {"r":255,"g":100,"b":50,"a":255}}}\n' +
+                                '• BOOLEANS: {"isBold": {"type": "boolean", "value": true}}\n' +
+                                '• VECTORS: {"anchorPoint": {"type": "vec2", "value": {"x":0.5,"y":1.0}}}\n' +
+                                '• SIZES: {"contentSize": {"type": "size", "value": {"width":200,"height":80}}}\n' +
+                                '• NODE REFS: {"player": {"type": "node", "value": "node-uuid-here"}}\n' +
+                                '• ASSETS: {"bulletPrefab": {"type": "prefab", "value": "prefab-uuid-here"}}\n' +
+                                '• SPRITES: {"spriteFrame": {"type": "spriteFrame", "value": "sprite-uuid-here"}}\n\n' +
+                                '⚠️ IMPORTANT: 1) Get UUIDs from asset_query and node_query tools first! 2) Use component_query to inspect exact property types - type mismatches will cause failures!',
+                            additionalProperties: {
                                 type: 'object',
                                 properties: {
-                                    property: {
+                                    type: {
                                         type: 'string',
-                                        description: 'Property name'
-                                    },
-                                    propertyType: {
-                                        type: 'string',
-                                        description: 'Property type - Must explicitly specify the property data type for correct value conversion and validation',
                                         enum: [
                                             'string', 'number', 'boolean', 'integer', 'float',
                                             'color', 'vec2', 'vec3', 'size',
@@ -186,48 +119,53 @@ export class ComponentTools implements ToolExecutor {
                                             'nodeArray', 'colorArray', 'numberArray', 'stringArray'
                                         ]
                                     },
-                                    value: {
-                                        description: 'Property value - Same format as set_component_property.value'
-                                    }
+                                    value: {}
                                 },
-                                required: ['property', 'propertyType', 'value']
+                                required: ['type', 'value']
                             }
                         }
                     },
-                    required: ['nodeUuid', 'componentType', 'properties']
+                    required: ['nodeUuid', 'componentType']
                 }
             },
             {
-                name: 'attach_script',
-                description: 'Attach a script component to a node',
+                name: 'configure_click_event',
+                description: 'Configure or remove click events for Button components. Supports adding new events, removing specific events, or clearing all events.',
                 inputSchema: {
                     type: 'object',
                     properties: {
                         nodeUuid: {
                             type: 'string',
-                            description: 'Node UUID'
+                            description: 'Target node UUID that has a Button component'
                         },
-                        scriptPath: {
+                        operation: {
                             type: 'string',
-                            description: 'Script asset path (e.g., db://assets/scripts/MyScript.ts)'
+                            enum: ['add', 'modify', 'remove', 'clear'],
+                            description: 'Operation type: "add" to add new event, "modify" to modify existing event, "remove" to remove specific event by index, "clear" to remove all events',
+                            default: 'add'
+                        },
+                        targetNodeUuid: {
+                            type: 'string',
+                            description: 'Target node UUID that contains the script component with the callback method (required for "add" operation)'
+                        },
+                        componentName: {
+                            type: 'string',
+                            description: 'Name of the script component on target node (required for "add" operation)'
+                        },
+                        handlerName: {
+                            type: 'string',
+                            description: 'Method name to call when button is clicked (required for "add" operation)'
+                        },
+                        customEventData: {
+                            type: 'string',
+                            description: 'Optional custom event data to pass to the handler (for "add" operation)'
+                        },
+                        eventIndex: {
+                            type: 'number',
+                            description: 'Index of the specific event to remove (0-based, required for "remove" operation)'
                         }
                     },
-                    required: ['nodeUuid', 'scriptPath']
-                }
-            },
-            {
-                name: 'get_available_components',
-                description: 'Get list of available component types',
-                inputSchema: {
-                    type: 'object',
-                    properties: {
-                        category: {
-                            type: 'string',
-                            description: 'Component category filter',
-                            enum: ['all', 'renderer', 'ui', 'physics', 'animation', 'audio'],
-                            default: 'all'
-                        }
-                    }
+                    required: ['nodeUuid']
                 }
             }
         ];
@@ -235,20 +173,23 @@ export class ComponentTools implements ToolExecutor {
 
     async execute(toolName: string, args: any): Promise<ToolResponse> {
         switch (toolName) {
+            case 'component_manage':
+                return await this.handleComponentManage(args);
+            case 'component_query':
+                return await this.handleComponentQuery(args);
+            case 'set_component_property':
+                return await this.setComponentProperties(args);
+            case 'configure_click_event':
+                return await this.configureClickEvent(args);
+            // 向后兼容性支持
             case 'add_component':
-                return await this.addComponent(args.nodeUuid, args.componentType);
+                return await this.addComponents(args.nodeUuid, args.componentType);
             case 'remove_component':
                 return await this.removeComponent(args.nodeUuid, args.componentType);
             case 'get_components':
                 return await this.getComponents(args.nodeUuid);
             case 'get_component_info':
                 return await this.getComponentInfo(args.nodeUuid, args.componentType);
-            case 'set_component_property':
-                return await this.setComponentProperty(args);
-            case 'set_component_properties':
-                return await this.setComponentProperties(args);
-            case 'attach_script':
-                return await this.attachScript(args.nodeUuid, args.scriptPath);
             case 'get_available_components':
                 return await this.getAvailableComponents(args.category);
             default:
@@ -256,97 +197,117 @@ export class ComponentTools implements ToolExecutor {
         }
     }
 
-    private async setComponentProperties(args: any): Promise<ToolResponse> {
-        const { nodeUuid, componentType, properties, continueOnError = true } = args || {};
-
-        if (!nodeUuid || !componentType) {
-            return { success: false, error: 'nodeUuid and componentType are required' };
+    // 新的整合处理函数
+    private async handleComponentManage(args: any): Promise<ToolResponse> {
+        const { action, nodeUuid, componentType } = args;
+        
+        switch (action) {
+            case 'add':
+                return await this.addComponents(nodeUuid, componentType);
+            case 'remove':
+                return await this.removeComponent(nodeUuid, componentType);
+            default:
+                return { success: false, error: `Unknown component manage action: ${action}` };
         }
+    }
 
-        if (!Array.isArray(properties) || properties.length === 0) {
-            return { success: false, error: 'properties must be a non-empty array' };
+    private async handleComponentQuery(args: any): Promise<ToolResponse> {
+        const { action, nodeUuid, componentType, category } = args;
+        
+        switch (action) {
+            case 'list':
+                return await this.getComponents(nodeUuid);
+            case 'info':
+                return await this.getComponentInfo(nodeUuid, componentType);
+            case 'available_types':
+                return await this.getAvailableComponents(category || 'all');
+            default:
+                return { success: false, error: `Unknown query action: ${action}` };
         }
+    }
 
+    /**
+     * 获取组件添加成功后的特定提醒信息
+     */
+    private getComponentReminder(componentType: string): string {
+        const reminders: { [key: string]: string } = {
+            'cc.Sprite': 'REMINDER: Set "spriteFrame" property to display the sprite. Use set_component_property to assign a sprite frame asset.',
+            'cc.Label': 'REMINDER: Set "string" property to display text content. Example: {"string": {"type": "string", "value": "Hello World"}}',
+            'cc.Button': 'REMINDER: Configure click events using configure_click_event tool. Also consider setting "normalColor", "pressedColor" and "transition" properties.',
+            'cc.EditBox': 'REMINDER: Set "string" property for placeholder text and configure "backgroundImage" for visual styling.',
+            'cc.ProgressBar': 'REMINDER: Set "totalLength" and "progress" properties to make the progress bar functional.',
+            'cc.Slider': 'REMINDER: Set "progress" property (0-1 range) and configure "handle" and "background" sprites.',
+            'cc.ScrollView': 'REMINDER: Configure "content" node and set "horizontal" or "vertical" scroll directions.',
+            'cc.PageView': 'REMINDER: Add child nodes as pages and set "direction" property (horizontal/vertical).',
+            'cc.Toggle': 'REMINDER: Set "isChecked" property and configure "checkMark" sprite for visual feedback.',
+            'cc.ToggleGroup': 'REMINDER: Assign toggle components to this group and set "allowSwitchOff" if needed.'
+        };
+        
+        return reminders[componentType] || '';
+    }
+
+    private async addComponents(nodeUuid: string, componentTypes: string | string[]): Promise<ToolResponse> {
+        // 将输入标准化为数组
+        const typesToAdd = Array.isArray(componentTypes) ? componentTypes : [componentTypes];
+        
+        if (typesToAdd.length === 0) {
+            return { success: false, error: 'No component types provided' };
+        }
+        
+        // 如果只有一个组件，使用原有的单个组件添加逻辑
+        if (typesToAdd.length === 1) {
+            return await this.addComponent(nodeUuid, typesToAdd[0]);
+        }
+        
+        // 批量添加多个组件
+        return await this.addMultipleComponents(nodeUuid, typesToAdd);
+    }
+
+    private async addMultipleComponents(nodeUuid: string, componentTypes: string[]): Promise<ToolResponse> {
         const results: any[] = [];
+        const errors: string[] = [];
         let successCount = 0;
-        let failCount = 0;
-
-        const shouldContinue = continueOnError !== undefined ? Boolean(continueOnError) : true;
-
-        for (let i = 0; i < properties.length; i++) {
-            const item = properties[i];
-
-            if (!item || typeof item !== 'object') {
-                results.push({ index: i, success: false, error: 'Invalid properties item (expected object)' });
-                failCount++;
-                if (!shouldContinue) break;
-                continue;
-            }
-
-            const property = (item as any).property;
-            const propertyType = (item as any).propertyType;
-            const value = (item as any).value;
-
-            if (!property || typeof property !== 'string') {
-                results.push({ index: i, success: false, error: 'Missing or invalid property (expected string)' });
-                failCount++;
-                if (!shouldContinue) break;
-                continue;
-            }
-
-            if (!propertyType || typeof propertyType !== 'string') {
-                results.push({ index: i, property, success: false, error: 'Missing or invalid propertyType (expected string)' });
-                failCount++;
-                if (!shouldContinue) break;
-                continue;
-            }
-
-            const singleResult = await this.setComponentProperty({
-                nodeUuid,
-                componentType,
-                property,
-                propertyType,
-                value
-            });
-
-            results.push({
-                index: i,
-                property,
-                propertyType,
-                success: singleResult.success,
-                message: singleResult.message,
-                error: singleResult.error,
-                data: singleResult.data
-            });
-
-            if (singleResult.success) {
-                successCount++;
-            } else {
-                failCount++;
-                if (!shouldContinue) break;
+        
+        for (const componentType of componentTypes) {
+            try {
+                const result = await this.addComponent(nodeUuid, componentType);
+                results.push({
+                    componentType,
+                    success: result.success,
+                    message: result.message,
+                    error: result.error
+                });
+                
+                if (result.success) {
+                    successCount++;
+                } else {
+                    errors.push(`${componentType}: ${result.error}`);
+                }
+            } catch (err: any) {
+                const errorMsg = `${componentType}: ${err.message}`;
+                errors.push(errorMsg);
+                results.push({
+                    componentType,
+                    success: false,
+                    error: errorMsg
+                });
             }
         }
-
-        const attemptedCount = results.length;
-        const skippedCount = properties.length - attemptedCount;
-        const success = failCount === 0 && skippedCount === 0;
-
-        const message = success
-            ? `Successfully set ${successCount} properties on component '${componentType}'`
-            : `Set ${successCount}/${properties.length} properties on component '${componentType}' (failed: ${failCount}${skippedCount > 0 ? `, skipped: ${skippedCount}` : ''})`;
-
+        
+        const totalRequested = componentTypes.length;
+        const isFullSuccess = successCount === totalRequested;
+        
         return {
-            success,
-            message,
+            success: isFullSuccess,
+            message: isFullSuccess 
+                ? `Successfully added all ${successCount} components`
+                : `Added ${successCount} of ${totalRequested} components`,
             data: {
                 nodeUuid,
-                componentType,
-                total: properties.length,
-                attemptedCount,
-                successCount,
-                failCount,
-                skippedCount,
-                results
+                totalRequested,
+                totalAdded: successCount,
+                results,
+                errors: errors.length > 0 ? errors : undefined
             }
         };
     }
@@ -358,9 +319,14 @@ export class ComponentTools implements ToolExecutor {
             if (allComponentsInfo.success && allComponentsInfo.data?.components) {
                 const existingComponent = allComponentsInfo.data.components.find((comp: any) => comp.type === componentType);
                 if (existingComponent) {
+                    const reminder = this.getComponentReminder(componentType);
+                    const message = reminder 
+                        ? `Component '${componentType}' already exists on node. ${reminder}`
+                        : `Component '${componentType}' already exists on node`;
+                    
                     resolve({
                         success: true,
-                        message: `Component '${componentType}' already exists on node`,
+                        message: message,
                         data: {
                             nodeUuid: nodeUuid,
                             componentType: componentType,
@@ -384,9 +350,14 @@ export class ComponentTools implements ToolExecutor {
                     if (allComponentsInfo2.success && allComponentsInfo2.data?.components) {
                         const addedComponent = allComponentsInfo2.data.components.find((comp: any) => comp.type === componentType);
                         if (addedComponent) {
+                            const reminder = this.getComponentReminder(componentType);
+                            const message = reminder 
+                                ? `Component '${componentType}' added successfully. ${reminder}`
+                                : `Component '${componentType}' added successfully`;
+                            
                             resolve({
                                 success: true,
-                                message: `Component '${componentType}' added successfully`,
+                                message: message,
                                 data: {
                                     nodeUuid: nodeUuid,
                                     componentType: componentType,
@@ -436,31 +407,87 @@ export class ComponentTools implements ToolExecutor {
                 resolve({ success: false, error: `Failed to get components for node '${nodeUuid}': ${allComponentsInfo.error}` });
                 return;
             }
-            // 2. 只查找type字段等于componentType的组件（即cid）
-            const exists = allComponentsInfo.data.components.some((comp: any) => comp.type === componentType);
-            if (!exists) {
+            
+            // 2. 查找type字段等于componentType的组件索引
+            const componentIndex = allComponentsInfo.data.components.findIndex((comp: any) => comp.type === componentType);
+            if (componentIndex === -1) {
                 resolve({ success: false, error: `Component cid '${componentType}' not found on node '${nodeUuid}'. 请用getComponents获取type字段（cid）作为componentType。` });
                 return;
             }
-            // 3. 官方API直接移除
+            
+            // 3. 尝试多种API方法移除组件
             try {
-                await Editor.Message.request('scene', 'remove-component', {
-                    uuid: nodeUuid,
-                    component: componentType
-                });
+                console.log(`Attempting to remove component at index ${componentIndex} (type: ${componentType}) from node ${nodeUuid}`);
+                
+                let removeSuccessful = false;
+                
+                // 方法1: 使用remove-array-element API（基于消息日志）
+                try {
+                    await Editor.Message.request('scene', 'remove-array-element', {
+                        uuid: nodeUuid,
+                        path: '__comps__',
+                        index: componentIndex
+                    });
+                    removeSuccessful = true;
+                } catch (removeError) {
+                    console.log(`remove-array-element failed:`, removeError);
+                }
+                
+                // 方法2: 尝试delete-component API
+                if (!removeSuccessful) {
+                    try {
+                        await Editor.Message.request('scene', 'delete-component', {
+                            uuid: nodeUuid,
+                            component: componentType
+                        });
+                        removeSuccessful = true;
+                    } catch (deleteError) {
+                        console.log(`delete-component failed:`, deleteError);
+                    }
+                }
+                
+                // 方法3: 备用方案 - 使用原始remove-component API但使用索引
+                if (!removeSuccessful) {
+                    try {
+                        await Editor.Message.request('scene', 'remove-component', {
+                            uuid: nodeUuid,
+                            component: componentIndex
+                        });
+                        removeSuccessful = true;
+                    } catch (removeError2) {
+                        console.log(`remove-component with index failed:`, removeError2);
+                    }
+                }
+                
+                // 方法4: 尝试使用类型名的remove-component API（原始代码）
+                if (!removeSuccessful) {
+                    try {
+                        await Editor.Message.request('scene', 'remove-component', {
+                            uuid: nodeUuid,
+                            component: componentType
+                        });
+                        removeSuccessful = true;
+                    } catch (removeError3) {
+                        console.log(`remove-component with type failed:`, removeError3);
+                    }
+                }
+                
                 // 4. 再查一次确认是否移除
                 const afterRemoveInfo = await this.getComponents(nodeUuid);
                 const stillExists = afterRemoveInfo.success && afterRemoveInfo.data?.components?.some((comp: any) => comp.type === componentType);
+                console.log(`After removal - components count: ${afterRemoveInfo.data?.components?.length}, still exists: ${stillExists}`);
+                
                 if (stillExists) {
-                    resolve({ success: false, error: `Component cid '${componentType}' was not removed from node '${nodeUuid}'.` });
+                    resolve({ success: false, error: `Component cid '${componentType}' was not removed from node '${nodeUuid}'. Index used: ${componentIndex}` });
                 } else {
                     resolve({
                         success: true,
-                        message: `Component cid '${componentType}' removed successfully from node '${nodeUuid}'`,
-                        data: { nodeUuid, componentType }
+                        message: `✅ Component '${componentType}' removed`,
+                        data: { nodeUuid, componentType, removedIndex: componentIndex }
                     });
                 }
             } catch (err: any) {
+                console.log(`Remove component error:`, err);
                 resolve({ success: false, error: `Failed to remove component: ${err.message}` });
             }
         });
@@ -647,6 +674,102 @@ export class ComponentTools implements ToolExecutor {
         }
     }
 
+    private async setComponentProperties(args: any): Promise<ToolResponse> {
+        // 检查是单个属性设置还是批量属性设置
+        if (args.properties) {
+            // 批量属性设置
+            return await this.setMultipleComponentProperties(args);
+        } else if (args.property && args.propertyType && args.value !== undefined) {
+            // 单个属性设置（propertyType是必需的）
+            return await this.setComponentProperty(args);
+        } else {
+            return {
+                success: false,
+                error: 'Invalid parameters. Use either single property format (property, propertyType, value) or batch format (properties). PropertyType is REQUIRED for single property setting!'
+            };
+        }
+    }
+
+    private async setMultipleComponentProperties(args: any): Promise<ToolResponse> {
+        const { nodeUuid, componentType, properties } = args;
+        
+        if (!properties || typeof properties !== 'object') {
+            return {
+                success: false,
+                error: 'Properties parameter must be an object with property definitions'
+            };
+        }
+
+        const results: any[] = [];
+        const errors: string[] = [];
+        let successCount = 0;
+        const propertyNames = Object.keys(properties);
+
+        for (const propertyName of propertyNames) {
+            const propertyDef = properties[propertyName];
+            
+            if (!propertyDef.type || propertyDef.value === undefined) {
+                const error = `Property '${propertyName}' must have 'type' and 'value' fields`;
+                errors.push(error);
+                results.push({
+                    property: propertyName,
+                    success: false,
+                    error
+                });
+                continue;
+            }
+
+            try {
+                const result = await this.setComponentProperty({
+                    nodeUuid,
+                    componentType,  
+                    property: propertyName,
+                    propertyType: propertyDef.type,
+                    value: propertyDef.value
+                });
+
+                results.push({
+                    property: propertyName,
+                    success: result.success,
+                    message: result.message,
+                    error: result.error
+                });
+
+                if (result.success) {
+                    successCount++;
+                } else {
+                    errors.push(`${propertyName}: ${result.error}`);
+                }
+            } catch (err: any) {
+                const errorMsg = `${propertyName}: ${err.message}`;
+                errors.push(errorMsg);
+                results.push({
+                    property: propertyName,
+                    success: false,
+                    error: errorMsg
+                });
+            }
+        }
+
+        const totalRequested = propertyNames.length;
+        const isFullSuccess = successCount === totalRequested;
+
+        return {
+            success: isFullSuccess,
+            message: isFullSuccess 
+                ? `Successfully set all ${successCount} properties`
+                : `Set ${successCount} of ${totalRequested} properties`,
+            data: {
+                nodeUuid,
+                componentType,
+                totalRequested,
+                totalSet: successCount,
+                results,
+                errors: errors.length > 0 ? errors : undefined
+            }
+        };
+    }
+
     private async setComponentProperty(args: any): Promise<ToolResponse> {
                         const { nodeUuid, componentType, property, propertyType, value } = args;
         
@@ -725,8 +848,20 @@ export class ComponentTools implements ToolExecutor {
                 const originalValue = propertyInfo.originalValue;
                 let processedValue: any;
                 
+                // 检查是否提供了必需的propertyType
+                if (!propertyType) {
+                    resolve({
+                        success: false,
+                        error: `Property type is required for property '${property}'. Please specify propertyType parameter. Available types: string, number, boolean, color, vec2, vec3, size, node, component, spriteFrame, prefab, asset, nodeArray, colorArray, numberArray, stringArray.`,
+                        instruction: `Use component_query to inspect the property and determine its correct type, then specify propertyType parameter.`
+                    });
+                    return;
+                }
+                
+                let finalPropertyType = propertyType;
+                
                 // 根据明确的propertyType处理属性值
-                switch (propertyType) {
+                switch (finalPropertyType) {
                     case 'string':
                         processedValue = String(value);
                         break;
@@ -751,38 +886,42 @@ export class ComponentTools implements ToolExecutor {
                                 a: value.a !== undefined ? Math.min(255, Math.max(0, Number(value.a))) : 255
                             };
                         } else {
-                            throw new Error('Color value must be an object with r, g, b properties or a hexadecimal string (e.g., "#FF0000")');
+                            throw new Error(`Color value must be an object with r, g, b properties or a hexadecimal string. Expected: {"r":255,"g":0,"b":0,"a":255} or "#FF0000", but received: ${JSON.stringify(value)} (${typeof value})`);
                         }
                         break;
                     case 'vec2':
-                        if (typeof value === 'object' && value !== null) {
+                        if (typeof value === 'object' && value !== null && 'x' in value && 'y' in value) {
                             processedValue = {
                                 x: Number(value.x) || 0,
                                 y: Number(value.y) || 0
                             };
                         } else {
-                            throw new Error('Vec2 value must be an object with x, y properties');
+                            throw new Error(`Vec2 value must be an object with x, y properties. Expected: {"x":100,"y":50}, but received: ${JSON.stringify(value)} (${typeof value})`);
                         }
                         break;
                     case 'vec3':
-                        if (typeof value === 'object' && value !== null) {
+                        if (typeof value === 'object' && value !== null && 'x' in value && 'y' in value && 'z' in value) {
                             processedValue = {
                                 x: Number(value.x) || 0,
                                 y: Number(value.y) || 0,
                                 z: Number(value.z) || 0
                             };
                         } else {
-                            throw new Error('Vec3 value must be an object with x, y, z properties');
+                            throw new Error(`Vec3 value must be an object with x, y, z properties. Expected: {"x":1,"y":2,"z":3}, but received: ${JSON.stringify(value)} (${typeof value})`);
                         }
                         break;
                     case 'size':
                         if (typeof value === 'object' && value !== null) {
-                            processedValue = {
-                                width: Number(value.width) || 0,
-                                height: Number(value.height) || 0
-                            };
+                            if ('width' in value && 'height' in value) {
+                                processedValue = {
+                                    width: Number(value.width) || 0,
+                                    height: Number(value.height) || 0
+                                };
+                            } else {
+                                throw new Error(`Size value must be an object with width, height properties. Expected: {"width":100,"height":50}, but received: ${JSON.stringify(value)}`);
+                            }
                         } else {
-                            throw new Error('Size value must be an object with width, height properties');
+                            throw new Error(`Size value must be an object with width, height properties. Expected: {"width":100,"height":50}, but received: ${JSON.stringify(value)} (${typeof value})`);
                         }
                         break;
                     case 'node':
@@ -806,7 +945,7 @@ export class ComponentTools implements ToolExecutor {
                         if (typeof value === 'string') {
                             processedValue = { uuid: value };
                         } else {
-                            throw new Error(`${propertyType} value must be a string UUID`);
+                            throw new Error(`${finalPropertyType} value must be a string UUID`);
                         }
                         break;
                     case 'nodeArray':
@@ -855,12 +994,12 @@ export class ComponentTools implements ToolExecutor {
                         }
                         break;
                     default:
-                        throw new Error(`Unsupported property type: ${propertyType}`);
+                        throw new Error(`Unsupported property type: ${finalPropertyType}`);
                 }
                 
-                console.log(`[ComponentTools] Converting value: ${JSON.stringify(value)} -> ${JSON.stringify(processedValue)} (type: ${propertyType})`);
-                console.log(`[ComponentTools] Property analysis result: propertyInfo.type="${propertyInfo.type}", propertyType="${propertyType}"`);
-                console.log(`[ComponentTools] Will use color special handling: ${propertyType === 'color' && processedValue && typeof processedValue === 'object'}`);
+                console.log(`[ComponentTools] Converting value: ${JSON.stringify(value)} -> ${JSON.stringify(processedValue)} (type: ${finalPropertyType})`);
+                console.log(`[ComponentTools] Property analysis result: propertyInfo.type="${propertyInfo.type}", propertyType="${finalPropertyType}"`);
+                console.log(`[ComponentTools] Will use color special handling: ${finalPropertyType === 'color' && processedValue && typeof processedValue === 'object'}`);
                 
                 // 用于验证的实际期望值（对于组件引用需要特殊处理）
                 let actualExpectedValue = processedValue;
@@ -898,13 +1037,13 @@ export class ComponentTools implements ToolExecutor {
                 let propertyPath = `__comps__.${rawComponentIndex}.${property}`;
                 
                 // 特殊处理资源类属性
-                if (propertyType === 'asset' || propertyType === 'spriteFrame' || propertyType === 'prefab' || 
-                    (propertyInfo.type === 'asset' && propertyType === 'string')) {
+                if (finalPropertyType === 'asset' || finalPropertyType === 'spriteFrame' || finalPropertyType === 'prefab' || 
+                    (propertyInfo.type === 'asset' && finalPropertyType === 'string')) {
                     
                     console.log(`[ComponentTools] Setting asset reference:`, {
                         value: processedValue,
                         property: property,
-                        propertyType: propertyType,
+                        propertyType: finalPropertyType,
                         path: propertyPath
                     });
                     
@@ -918,7 +1057,7 @@ export class ComponentTools implements ToolExecutor {
                         assetType = 'cc.Font';
                     } else if (property.toLowerCase().includes('clip')) {
                         assetType = 'cc.AudioClip';
-                    } else if (propertyType === 'prefab') {
+                    } else if (finalPropertyType === 'prefab') {
                         assetType = 'cc.Prefab';
                     }
                     
@@ -932,8 +1071,9 @@ export class ComponentTools implements ToolExecutor {
                     });
                 } else if (componentType === 'cc.UITransform' && (property === '_contentSize' || property === 'contentSize')) {
                     // Special handling for UITransform contentSize - set width and height separately
-                    const width = Number(value.width) || 100;
-                    const height = Number(value.height) || 100;
+                    // FIXED: Use proper null checking instead of || which treats 0 as falsy
+                    const width = value.width !== undefined ? Number(value.width) : 100;
+                    const height = value.height !== undefined ? Number(value.height) : 100;
                     
                     // Set width first
                     await Editor.Message.request('scene', 'set-property', {
@@ -950,8 +1090,9 @@ export class ComponentTools implements ToolExecutor {
                     });
                 } else if (componentType === 'cc.UITransform' && (property === '_anchorPoint' || property === 'anchorPoint')) {
                     // Special handling for UITransform anchorPoint - set anchorX and anchorY separately
-                    const anchorX = Number(value.x) || 0.5;
-                    const anchorY = Number(value.y) || 0.5;
+                    // FIXED: Use proper null checking instead of || which treats 0 as falsy
+                    const anchorX = value.x !== undefined ? Number(value.x) : 0.5;
+                    const anchorY = value.y !== undefined ? Number(value.y) : 0.5;
                     
                     // Set anchorX first
                     await Editor.Message.request('scene', 'set-property', {
@@ -1236,84 +1377,6 @@ export class ComponentTools implements ToolExecutor {
     }
 
 
-    private async attachScript(nodeUuid: string, scriptPath: string): Promise<ToolResponse> {
-        return new Promise(async (resolve) => {
-            // 从脚本路径提取组件类名
-            const scriptName = scriptPath.split('/').pop()?.replace('.ts', '').replace('.js', '');
-            if (!scriptName) {
-                resolve({ success: false, error: 'Invalid script path' });
-                return;
-            }
-            // 先查找节点上是否已存在该脚本组件
-            const allComponentsInfo = await this.getComponents(nodeUuid);
-            if (allComponentsInfo.success && allComponentsInfo.data?.components) {
-                const existingScript = allComponentsInfo.data.components.find((comp: any) => comp.type === scriptName);
-                if (existingScript) {
-                    resolve({
-                        success: true,
-                        message: `Script '${scriptName}' already exists on node`,
-                        data: {
-                            nodeUuid: nodeUuid,
-                            componentName: scriptName,
-                            existing: true
-                        }
-                    });
-                    return;
-                }
-            }
-            // 首先尝试直接使用脚本名称作为组件类型
-            Editor.Message.request('scene', 'create-component', {
-                uuid: nodeUuid,
-                component: scriptName  // 使用脚本名称而非UUID
-            }).then(async (result: any) => {
-                // 等待一段时间让Editor完成组件添加
-                await new Promise(resolve => setTimeout(resolve, 100));
-                // 重新查询节点信息验证脚本是否真的添加成功
-                const allComponentsInfo2 = await this.getComponents(nodeUuid);
-                if (allComponentsInfo2.success && allComponentsInfo2.data?.components) {
-                    const addedScript = allComponentsInfo2.data.components.find((comp: any) => comp.type === scriptName);
-                    if (addedScript) {
-                        resolve({
-                            success: true,
-                            message: `Script '${scriptName}' attached successfully`,
-                            data: {
-                                nodeUuid: nodeUuid,
-                                componentName: scriptName,
-                                existing: false
-                            }
-                        });
-                    } else {
-                        resolve({
-                            success: false,
-                            error: `Script '${scriptName}' was not found on node after addition. Available components: ${allComponentsInfo2.data.components.map((c: any) => c.type).join(', ')}`
-                        });
-                    }
-                } else {
-                    resolve({
-                        success: false,
-                        error: `Failed to verify script addition: ${allComponentsInfo2.error || 'Unable to get node components'}`
-                    });
-                }
-            }).catch((err: Error) => {
-                // 备用方案：使用场景脚本
-                const options = {
-                    name: 'cocos-mcp-server',
-                    method: 'attachScript',
-                    args: [nodeUuid, scriptPath]
-                };
-                Editor.Message.request('scene', 'execute-scene-script', options).then((result: any) => {
-                    resolve(result);
-                }).catch(() => {
-                    resolve({ 
-                        success: false, 
-                        error: `Failed to attach script '${scriptName}': ${err.message}`,
-                        instruction: 'Please ensure the script is properly compiled and exported as a Component class. You can also manually attach the script through the Properties panel in the editor.'
-                    });
-                });
-            });
-        });
-    }
-
     private async getAvailableComponents(category: string = 'all'): Promise<ToolResponse> {
         const componentCategories: Record<string, string[]> = {
             renderer: ['cc.Sprite', 'cc.Label', 'cc.RichText', 'cc.Mask', 'cc.Graphics'],
@@ -1539,6 +1602,88 @@ export class ComponentTools implements ToolExecutor {
             availableProperties,
             originalValue: propertyValue
         };
+    }
+
+    /**
+     * 自动检测属性类型
+     */
+    private autoDetectPropertyType(propertyName: string, value: any, originalValue: any, detectedType: string): string {
+        // 1. 基于属性名称的启发式检测
+        const nameLower = propertyName.toLowerCase();
+        
+        // 资源类型检测
+        if (nameLower.includes('prefab')) return 'prefab';
+        if (nameLower.includes('spriteframe') || nameLower.includes('sprite_frame')) return 'spriteFrame';
+        if (nameLower.includes('material')) return 'asset';
+        if (nameLower.includes('texture') || nameLower.includes('font') || nameLower.includes('clip')) return 'asset';
+        
+        // 节点引用检测
+        if (nameLower.includes('node') || nameLower.includes('target') || nameLower.includes('player') || 
+            nameLower.includes('enemy') || nameLower.includes('bullet') || nameLower.includes('ui') ||
+            nameLower.includes('layer') || nameLower.includes('canvas')) return 'node';
+        
+        // 组件引用检测
+        if (nameLower.includes('component')) return 'component';
+        
+        // 2. 基于值类型的检测
+        if (typeof value === 'string') {
+            // UUID格式检测
+            if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) {
+                // 长UUID通常是资源引用
+                return 'asset';
+            }
+            // 十六进制颜色检测
+            if (/^#[0-9a-f]{6}$/i.test(value)) {
+                return 'color';
+            }
+            return 'string';
+        }
+        
+        if (typeof value === 'number') return 'number';
+        if (typeof value === 'boolean') return 'boolean';
+        
+        // 对象类型检测
+        if (typeof value === 'object' && value !== null) {
+            // 颜色对象检测
+            if ('r' in value && 'g' in value && 'b' in value) return 'color';
+            // Vec2检测
+            if ('x' in value && 'y' in value && !('z' in value)) return 'vec2';
+            // Vec3检测
+            if ('x' in value && 'y' in value && 'z' in value) return 'vec3';
+            // Size检测
+            if ('width' in value && 'height' in value) return 'size';
+            // UUID对象检测（资源引用）
+            if ('uuid' in value) return 'asset';
+        }
+        
+        // 数组类型检测
+        if (Array.isArray(value)) {
+            if (value.length > 0) {
+                const firstItem = value[0];
+                if (typeof firstItem === 'string') return 'stringArray';
+                if (typeof firstItem === 'number') return 'numberArray';
+                if (typeof firstItem === 'object' && firstItem !== null) {
+                    if ('r' in firstItem && 'g' in firstItem && 'b' in firstItem) return 'colorArray';
+                    if ('uuid' in firstItem) return 'nodeArray';
+                }
+            }
+            return 'stringArray'; // 默认字符串数组
+        }
+        
+        // 3. 基于原始值的回退检测
+        if (originalValue !== undefined && originalValue !== null) {
+            if (typeof originalValue === 'object' && 'r' in originalValue) return 'color';
+            if (typeof originalValue === 'object' && 'x' in originalValue && 'y' in originalValue) {
+                return 'z' in originalValue ? 'vec3' : 'vec2';
+            }
+            if (typeof originalValue === 'object' && 'width' in originalValue) return 'size';
+        }
+        
+        // 4. 使用检测到的类型作为回退
+        if (detectedType && detectedType !== 'unknown') return detectedType;
+        
+        // 5. 最终回退到基本类型
+        return 'string';
     }
 
     private smartConvertValue(inputValue: any, propertyInfo: any): any {
@@ -1921,5 +2066,519 @@ export class ComponentTools implements ToolExecutor {
             console.error(`[quickVerifyAsset] Error:`, error);
             return null;
         }
+    }
+
+    /**
+     * 配置按钮点击事件 - 统一接口支持添加、移除和清空操作
+     */
+    private async configureClickEvent(args: any): Promise<ToolResponse> {
+        return new Promise(async (resolve) => {
+            try {
+                const { nodeUuid, operation = 'add', targetNodeUuid, componentName, handlerName, customEventData, eventIndex } = args;
+
+                // 重新获取最新的组件状态，确保数据同步
+                const refreshedComponents = await this.getComponents(nodeUuid);
+                if (!refreshedComponents.success || !refreshedComponents.data?.components) {
+                    resolve({ success: false, error: 'Button node not found or has no components' });
+                    return;
+                }
+
+                const buttonComponent = refreshedComponents.data.components.find((comp: any) => comp.type === 'cc.Button');
+                if (!buttonComponent) {
+                    resolve({ success: false, error: 'Node does not have a Button component' });
+                    return;
+                }
+
+                // 获取当前的clickEvents数组，确保使用最新数据
+                let currentClickEvents: any[] = [];
+                if (buttonComponent.properties.clickEvents && buttonComponent.properties.clickEvents.value) {
+                    currentClickEvents = Array.isArray(buttonComponent.properties.clickEvents.value) 
+                        ? buttonComponent.properties.clickEvents.value 
+                        : [];
+                }
+                
+                console.log(`Current clickEvents count: ${currentClickEvents.length}, operation: ${operation}`);
+
+                const previousEventCount = currentClickEvents.length;
+                let updatedClickEvents: any[] = [];
+                let message = '';
+
+                switch (operation) {
+                    case 'modify':
+                        // 修改现有事件
+                        if (eventIndex === undefined || eventIndex < 0 || eventIndex >= currentClickEvents.length) {
+                            resolve({ 
+                                success: false, 
+                                error: `Invalid event index ${eventIndex}. Available indices: 0-${currentClickEvents.length - 1}` 
+                            });
+                            return;
+                        }
+
+                        // 根据编辑器的行为优化：深拷贝事件数据以避免直接修改引用
+                        updatedClickEvents = [...currentClickEvents];
+                        // 深拷贝要修改的事件，避免修改原始数据
+                        const existingEvent = JSON.parse(JSON.stringify(currentClickEvents[eventIndex]));
+                        
+                        // 如果要修改目标节点或组件，需要完整验证
+                        if (targetNodeUuid !== undefined || componentName !== undefined) {
+                            // 确定要验证的节点和组件
+                            const nodeToVerify = targetNodeUuid || existingEvent.value.target.value.uuid;
+                            const compToVerify = componentName || existingEvent.value._componentId.value;
+                            
+                            // 1. 首先验证节点是否存在
+                            if (targetNodeUuid !== undefined) {
+                                const verifyNodeComponents = await this.getComponents(targetNodeUuid);
+                                if (!verifyNodeComponents.success || !verifyNodeComponents.data?.components) {
+                                    resolve({ 
+                                        success: false, 
+                                        error: `Target node '${targetNodeUuid}' not found or has no components` 
+                                    });
+                                    return;
+                                }
+                                
+                                // 2. 如果同时要修改组件，验证组件是否存在
+                                if (componentName !== undefined) {
+                                    const verifyTargetComponent = verifyNodeComponents.data.components.find((comp: any) => 
+                                        comp.type === componentName || 
+                                        (comp.properties && comp.properties._name && comp.properties._name.value === componentName)
+                                    );
+                                    
+                                    if (!verifyTargetComponent) {
+                                        resolve({ 
+                                            success: false, 
+                                            error: `Component '${componentName}' not found on target node. Available components: ${verifyNodeComponents.data.components.map((c: any) => c.type).join(', ')}` 
+                                        });
+                                        return;
+                                    }
+                                }
+                            }
+                            
+                            // 3. 验证 handler 方法是否存在
+                            if (handlerName !== undefined && nodeToVerify && compToVerify) {
+                                try {
+                                    console.log(`Verifying handler '${handlerName}' on node ${nodeToVerify}, component ${compToVerify}`);
+                                    const componentFunctions = await Editor.Message.request('scene', 'query-component-function-of-node', nodeToVerify);
+                                    console.log('Component functions for modify:', componentFunctions);
+                                    
+                                    let handlerFound = false;
+                                    if (componentFunctions && Array.isArray(componentFunctions)) {
+                                        for (const compFuncs of componentFunctions) {
+                                            if (compFuncs.component === compToVerify || compFuncs.name === compToVerify) {
+                                                if (compFuncs.functions && Array.isArray(compFuncs.functions)) {
+                                                    handlerFound = compFuncs.functions.some((func: any) => 
+                                                        func === handlerName || 
+                                                        (typeof func === 'object' && func.name === handlerName)
+                                                    );
+                                                    if (handlerFound) break;
+                                                }
+                                            }
+                                        }
+                                    } else if (componentFunctions && typeof componentFunctions === 'object' && componentFunctions[compToVerify]) {
+                                        const funcs = componentFunctions[compToVerify];
+                                        if (Array.isArray(funcs)) {
+                                            handlerFound = funcs.includes(handlerName);
+                                        } else if (funcs.functions && Array.isArray(funcs.functions)) {
+                                            handlerFound = funcs.functions.includes(handlerName);
+                                        }
+                                    }
+                                    
+                                    if (!handlerFound) {
+                                        console.warn(`Handler '${handlerName}' not found in component '${compToVerify}' on node ${nodeToVerify}. This might be a custom method.`);
+                                        // 不阻止操作，因为可能是自定义方法
+                                    }
+                                } catch (err) {
+                                    console.error('Failed to verify handler for modify operation:', err);
+                                    // 查询失败不应该阻止操作
+                                }
+                            }
+                        }
+                        
+                        // 更新指定的属性
+                        if (targetNodeUuid !== undefined) {
+                            existingEvent.value.target.value.uuid = targetNodeUuid;
+                        }
+                        if (componentName !== undefined) {
+                            existingEvent.value._componentId.value = componentName;
+                        }
+                        if (handlerName !== undefined) {
+                            existingEvent.value.handler.value = handlerName;
+                        }
+                        if (customEventData !== undefined) {
+                            existingEvent.value.customEventData.value = customEventData;
+                        }
+                        
+                        // 将修改后的事件放回数组
+                        updatedClickEvents[eventIndex] = existingEvent;
+                        message = `Click event at index ${eventIndex} modified successfully`;
+                        break;
+
+                    case 'add':
+                        // 验证目标节点和组件是否存在
+                        const targetComponents = await this.getComponents(targetNodeUuid);
+                        if (!targetComponents.success || !targetComponents.data?.components) {
+                            resolve({ success: false, error: 'Target node not found or has no components' });
+                            return;
+                        }
+
+                        const targetComponent = targetComponents.data.components.find((comp: any) => 
+                            comp.type === componentName || 
+                            (comp.properties && comp.properties._name && comp.properties._name.value === componentName)
+                        );
+                        
+                        if (!targetComponent) {
+                            resolve({ 
+                                success: false, 
+                                error: `Component '${componentName}' not found on target node. Available components: ${targetComponents.data.components.map((c: any) => c.type).join(', ')}` 
+                            });
+                            return;
+                        }
+                        
+                        // 验证 handler 方法是否存在于目标组件中
+                        if (handlerName) {
+                            try {
+                                console.log(`Querying component functions for node: ${targetNodeUuid}`);
+                                const componentFunctions = await Editor.Message.request('scene', 'query-component-function-of-node', targetNodeUuid);
+                                console.log('Component functions result:', componentFunctions);
+                                
+                                // 检查返回的函数列表中是否包含指定的 handler
+                                let handlerFound = false;
+                                if (componentFunctions && Array.isArray(componentFunctions)) {
+                                    // 遍历所有组件的函数
+                                    for (const compFuncs of componentFunctions) {
+                                        if (compFuncs.component === componentName || compFuncs.name === componentName) {
+                                            // 检查该组件的函数列表
+                                            if (compFuncs.functions && Array.isArray(compFuncs.functions)) {
+                                                handlerFound = compFuncs.functions.some((func: any) => 
+                                                    func === handlerName || 
+                                                    (typeof func === 'object' && func.name === handlerName)
+                                                );
+                                                if (handlerFound) break;
+                                            }
+                                        }
+                                    }
+                                } else if (componentFunctions && typeof componentFunctions === 'object') {
+                                    // 可能返回的是对象格式
+                                    if (componentFunctions[componentName]) {
+                                        const funcs = componentFunctions[componentName];
+                                        if (Array.isArray(funcs)) {
+                                            handlerFound = funcs.includes(handlerName);
+                                        } else if (funcs.functions && Array.isArray(funcs.functions)) {
+                                            handlerFound = funcs.functions.includes(handlerName);
+                                        }
+                                    }
+                                }
+                                
+                                if (!handlerFound) {
+                                    console.warn(`Handler '${handlerName}' not found in component '${componentName}' functions. This might be a custom method or the query failed.`);
+                                    // 不要直接失败，因为可能是自定义方法或查询失败
+                                    // 只是记录警告，让操作继续
+                                }
+                            } catch (err) {
+                                console.error('Failed to query component functions:', err);
+                                // 查询失败不应该阻止操作，只记录错误
+                            }
+                        }
+
+                        // 构建符合Cocos Creator编辑器格式的点击事件配置
+                        // 基于实际事件结构分析，使用完整的嵌套格式
+                        const clickEventData = {
+                            value: {
+                                target: {
+                                    name: "target",
+                                    value: { uuid: targetNodeUuid },
+                                    default: null,
+                                    type: "cc.Node",
+                                    readonly: false,
+                                    visible: true,
+                                    animatable: true,
+                                    tooltip: "i18n:ENGINE.button.click_event.target",
+                                    displayName: "i18n:ENGINE.classes.cc.ClickEvent.properties.target.displayName",
+                                    extends: ["cc.Object"]
+                                },
+                                component: {
+                                    name: "component",
+                                    value: "",
+                                    default: "",
+                                    type: "String",
+                                    readonly: false,
+                                    visible: true,
+                                    animatable: true,
+                                    tooltip: "i18n:ENGINE.button.click_event.component",
+                                    displayName: "i18n:ENGINE.classes.cc.ClickEvent.properties.component.displayName",
+                                    extends: []
+                                },
+                                _componentId: {
+                                    name: "_componentId",
+                                    value: componentName,
+                                    default: "",
+                                    type: "String",
+                                    readonly: false,
+                                    visible: false,
+                                    animatable: true,
+                                    displayName: "i18n:ENGINE.classes.cc.ClickEvent.properties._componentId.displayName",
+                                    tooltip: "i18n:ENGINE.classes.cc.ClickEvent.properties._componentId.tooltip",
+                                    extends: []
+                                },
+                                handler: {
+                                    name: "handler",
+                                    value: handlerName,
+                                    default: "",
+                                    type: "String",
+                                    readonly: false,
+                                    visible: true,
+                                    animatable: true,
+                                    tooltip: "i18n:ENGINE.button.click_event.handler",
+                                    displayName: "i18n:ENGINE.classes.cc.ClickEvent.properties.handler.displayName",
+                                    extends: []
+                                },
+                                customEventData: {
+                                    name: "customEventData",
+                                    value: customEventData || "",
+                                    default: "",
+                                    type: "String",
+                                    readonly: false,
+                                    visible: true,
+                                    animatable: true,
+                                    tooltip: "i18n:ENGINE.button.click_event.customEventData",
+                                    displayName: "i18n:ENGINE.classes.cc.ClickEvent.properties.customEventData.displayName",
+                                    extends: []
+                                }
+                            },
+                            default: {
+                                type: "cc.ClickEvent",
+                                value: {
+                                    target: {
+                                        name: "target",
+                                        value: { uuid: "" },
+                                        default: null,
+                                        type: "cc.Node",
+                                        readonly: false,
+                                        visible: true,
+                                        animatable: true,
+                                        tooltip: "i18n:ENGINE.button.click_event.target",
+                                        displayName: "i18n:ENGINE.classes.cc.ClickEvent.properties.target.displayName",
+                                        extends: ["cc.Object"]
+                                    },
+                                    component: {
+                                        name: "component",
+                                        value: "",
+                                        default: "",
+                                        type: "String",
+                                        readonly: false,
+                                        visible: true,
+                                        animatable: true,
+                                        tooltip: "i18n:ENGINE.button.click_event.component",
+                                        displayName: "i18n:ENGINE.classes.cc.ClickEvent.properties.component.displayName",
+                                        extends: []
+                                    },
+                                    _componentId: {
+                                        name: "_componentId",
+                                        value: "",
+                                        default: "",
+                                        
+                                        type: "String",
+                                        readonly: false,
+                                        visible: false,
+                                        animatable: true,
+                                        displayName: "i18n:ENGINE.classes.cc.ClickEvent.properties._componentId.displayName",
+                                        tooltip: "i18n:ENGINE.classes.cc.ClickEvent.properties._componentId.tooltip",
+                                        extends: []
+                                    },
+                                    handler: {
+                                        name: "handler",
+                                        value: "",
+                                        default: "",
+                                        type: "String",
+                                        readonly: false,
+                                        visible: true,
+                                        animatable: true,
+                                        tooltip: "i18n:ENGINE.button.click_event.handler",
+                                        displayName: "i18n:ENGINE.classes.cc.ClickEvent.properties.handler.displayName",
+                                        extends: []
+                                    },
+                                    customEventData: {
+                                        name: "customEventData",
+                                        value: "",
+                                        default: "",
+                                        type: "String",
+                                        readonly: false,
+                                        visible: true,
+                                        animatable: true,
+                                        tooltip: "i18n:ENGINE.button.click_event.customEventData",
+                                        displayName: "i18n:ENGINE.classes.cc.ClickEvent.properties.customEventData.displayName",
+                                        extends: []
+                                    }
+                                }
+                            },
+                            type: "cc.ClickEvent",
+                            readonly: false,
+                            visible: true,
+                            animatable: true,
+                            tooltip: "i18n:ENGINE.button.click_events",
+                            displayOrder: 20,
+                            extends: []
+                        };
+
+                        updatedClickEvents = [...currentClickEvents, clickEventData];
+                        message = `Click event added successfully: ${targetNodeUuid}.${componentName}.${handlerName}()`;
+                        break;
+
+                    case 'remove':
+                        if (eventIndex === undefined || eventIndex < 0 || eventIndex >= currentClickEvents.length) {
+                            resolve({ 
+                                success: false, 
+                                error: `Invalid event index ${eventIndex}. Available indices: 0-${currentClickEvents.length - 1}` 
+                            });
+                            return;
+                        }
+                        
+                        updatedClickEvents = currentClickEvents.filter((_, index) => index !== eventIndex);
+                        message = `Click event at index ${eventIndex} removed successfully`;
+                        break;
+
+                    case 'clear':
+                        updatedClickEvents = [];
+                        message = `All click events cleared successfully (removed ${currentClickEvents.length} events)`;
+                        break;
+
+                    default:
+                        resolve({ success: false, error: `Unknown operation: ${operation}` });
+                        return;
+                }
+
+                // 使用Editor的set-property消息设置clickEvents
+                // 找到Button组件在组件数组中的索引位置
+                const buttonIndex = refreshedComponents.data.components.findIndex((comp: any) => comp.type === 'cc.Button');
+                
+                if (buttonIndex === -1) {
+                    resolve({ success: false, error: 'Button component index not found' });
+                    return;
+                }
+                
+                console.log(`Setting clickEvents for Button at index ${buttonIndex}, operation: ${operation}`);
+                console.log(`Previous event count: ${previousEventCount}, New event count: ${updatedClickEvents.length}`);
+                
+                // 使用正确的编辑器API格式，根据引擎源码分析的结果
+                Editor.Message.request('scene', 'set-property', {
+                    uuid: nodeUuid,
+                    path: `__comps__.${buttonIndex}.clickEvents`,
+                    dump: {
+                        type: 'cc.ClickEvent',
+                        isArray: true,
+                        value: updatedClickEvents
+                    }
+                }).then(async (result: any) => {
+                    console.log('set-property result:', result);
+                    
+                    // 等待一段时间让Editor完成更新
+                    await new Promise(resolve => setTimeout(resolve, 300));
+                    
+                    // 重新获取组件状态以验证修改是否成功
+                    const verifyComponents = await this.getComponents(nodeUuid);
+                    if (!verifyComponents.success || !verifyComponents.data?.components) {
+                        resolve({ 
+                            success: false, 
+                            error: 'Failed to verify click event changes - cannot retrieve component data' 
+                        });
+                        return;
+                    }
+                    
+                    const verifyButton = verifyComponents.data.components.find((comp: any) => comp.type === 'cc.Button');
+                    if (!verifyButton) {
+                        resolve({ 
+                            success: false, 
+                            error: 'Failed to verify click event changes - Button component not found' 
+                        });
+                        return;
+                    }
+                    
+                    // 获取更新后的clickEvents
+                    let verifiedClickEvents: any[] = [];
+                    if (verifyButton.properties.clickEvents && verifyButton.properties.clickEvents.value) {
+                        verifiedClickEvents = Array.isArray(verifyButton.properties.clickEvents.value) 
+                            ? verifyButton.properties.clickEvents.value 
+                            : [];
+                    }
+                    
+                    const verifiedEventCount = verifiedClickEvents.length;
+                    console.log(`Verification - Expected event count: ${updatedClickEvents.length}, Actual event count: ${verifiedEventCount}`);
+                    
+                    // 验证事件数量是否正确
+                    let verificationSuccess = false;
+                    switch (operation) {
+                        case 'add':
+                            verificationSuccess = verifiedEventCount === previousEventCount + 1;
+                            break;
+                        case 'remove':
+                            verificationSuccess = verifiedEventCount === previousEventCount - 1;
+                            break;
+                        case 'clear':
+                            verificationSuccess = verifiedEventCount === 0;
+                            break;
+                        case 'modify':
+                            verificationSuccess = verifiedEventCount === previousEventCount;
+                            // 对于修改操作，还需要验证具体的修改是否生效
+                            if (verificationSuccess && eventIndex !== undefined && verifiedClickEvents[eventIndex]) {
+                                const modifiedEvent = verifiedClickEvents[eventIndex];
+                                if (targetNodeUuid !== undefined && modifiedEvent.value.target.value.uuid !== targetNodeUuid) {
+                                    verificationSuccess = false;
+                                    console.log(`Modify verification failed: target UUID mismatch`);
+                                }
+                                if (componentName !== undefined && modifiedEvent.value._componentId.value !== componentName) {
+                                    verificationSuccess = false;
+                                    console.log(`Modify verification failed: component name mismatch`);
+                                }
+                                if (handlerName !== undefined && modifiedEvent.value.handler.value !== handlerName) {
+                                    verificationSuccess = false;
+                                    console.log(`Modify verification failed: handler name mismatch`);
+                                }
+                                if (customEventData !== undefined && modifiedEvent.value.customEventData.value !== customEventData) {
+                                    verificationSuccess = false;
+                                    console.log(`Modify verification failed: custom data mismatch`);
+                                }
+                            }
+                            break;
+                    }
+                    
+                    if (verificationSuccess) {
+                        resolve({
+                            success: true,
+                            message: message + ' (verified)',
+                            data: {
+                                nodeUuid,
+                                operation,
+                                previousEventCount: previousEventCount,
+                                newEventCount: verifiedEventCount,
+                                verified: true,
+                                clickEvents: verifiedClickEvents
+                            }
+                        });
+                    } else {
+                        resolve({
+                            success: false,
+                            error: `Click event ${operation} operation failed verification. Expected ${updatedClickEvents.length} events, but found ${verifiedEventCount} events.`,
+                            data: {
+                                nodeUuid,
+                                operation,
+                                expectedEventCount: updatedClickEvents.length,
+                                actualEventCount: verifiedEventCount,
+                                previousEventCount: previousEventCount
+                            }
+                        });
+                    }
+                }).catch((err: Error) => {
+                    resolve({ 
+                        success: false, 
+                        error: `Editor API error: ${err.message}` 
+                    });
+                });
+
+            } catch (err: any) {
+                resolve({ 
+                    success: false, 
+                    error: `Configuration error: ${err.message}` 
+                });
+            }
+        });
     }
 }

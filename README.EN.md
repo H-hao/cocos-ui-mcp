@@ -1,27 +1,16 @@
 # Cocos MCP Server (CreatorFramework Fork)
 
-**[📖 English](README.EN.md)**  **[📖 中文](README.md)**
+**[English](README.EN.md) | [中文](README.md)**
 
-This repository is a maintained fork of `DaxianLee/cocos-mcp-server`. This README focuses on fork-specific work and avoids repeating most upstream generic documentation.
+This repository is a maintained fork of `DaxianLee/cocos-mcp-server`. Documentation is aligned with the current implementation at **v1.5.4**.
 
-## UI Preview
+## Project Positioning
 
-### Main Dashboard
-
-![MCP Main Dashboard](image/main-ui.jpg)
-
-### MCP Tools Menu
-
-![MCP Tools Menu](image/tools-ui.jpg)
-
-## Key Changes in This Fork
-
-- Panel frontend refactor to `Vite + Vue 3 + Tailwind CSS + Element Plus`.
-- Cleanup obsolete files to simplify project structure and reduce maintenance overhead.
-- Added `restart-server-from-dist` hot-restart flow and improved server recreation after settings updates.
-- Improved MCP compatibility with session ID handling, notification processing, and JSON fault-tolerant parsing.
-- Added/enhanced tool capability such as batch component property updates via `set_component_properties`.
-- Improved UX with categorized tool toggles, tool stats, save-state feedback, polling, and toast notifications.
+- Panel stack: `Vue 3 + Element Plus + Vite`
+- Backend build: `tsc`
+- Transport: `Streamable HTTP (MCP 2025-03-26)`
+- Public MCP tools: `50` across 13 categories
+- `sceneAdvanced`: fully removed from public tool surface
 
 ## Quick Start
 
@@ -31,46 +20,77 @@ npm install
 npm run build
 ```
 
-Build panel UI only:
+Build panel only:
 
 ```bash
 npm run build:panel
 ```
 
-Watch mode:
+Build backend TypeScript only:
 
 ```bash
-npm run watch
+npm run build:ts
 ```
 
 ## MCP Endpoint
 
-Default endpoint after server start: `http://127.0.0.1:3000/mcp`
-
-Claude CLI example:
-
-```bash
-claude mcp add --transport http cocos-creator http://127.0.0.1:3000/mcp
-```
-
-## Project Focus Structure
+Default endpoint:
 
 ```text
-cocos-mcp-server/
-├── source/                    # Extension core and MCP server
-├── panel-ui/                  # New Vue + Vite panel frontend
-├── dist/                      # Build outputs (including dist/panel-ui)
-├── vite.panel.config.ts       # Panel build config
-├── tailwind.config.ts         # Tailwind config
-└── package.json               # Scripts and extension metadata
+http://127.0.0.1:3000/mcp
 ```
 
-## Upstream Relationship
+## AI Client Configuration Overview
+
+- Auto-write: `Cursor`, `Windsurf`, `Trea CN`, `Codex CLI`
+- Manual commands: `Claude CLI`, `Gemini CLI`
+- Panel features: status query, config snippet generation, CLI command generation, per-client and batch add/remove, open config file
+
+Documented main-process messages:
+
+- `get-config-status`
+- `generate-cli-commands`
+- `generate-client-config`
+- `add-to-client` / `remove-from-client`
+- `add-to-all-clients` / `remove-from-all-clients`
+- `open-config-file`
+- `open-tool-manager`
+
+## Tool Capability Overview (50)
+
+| Category | Count |
+|---|---:|
+| scene | 5 |
+| node | 8 |
+| component | 4 |
+| prefab | 4 |
+| project | 2 |
+| debug | 3 |
+| preferences | 3 |
+| server | 2 |
+| broadcast | 2 |
+| sceneView | 5 |
+| referenceImage | 4 |
+| assetAdvanced | 5 |
+| validation | 3 |
+
+Naming rule: use `category_tool` format (for example `node_node_query`, `scene_scene_management`).
+
+## Documentation Navigation
+
+- Installation (CN): [INSTALL.md](INSTALL.md)
+- Installation (EN): [INSTALL.EN.md](INSTALL.EN.md)
+- Feature Guide (CN): [FEATURE_GUIDE_CN.md](FEATURE_GUIDE_CN.md)
+- Feature Guide (EN): [FEATURE_GUIDE_EN.md](FEATURE_GUIDE_EN.md)
+
+## Change Summary (vs old docs)
+
+- Tool count and category descriptions are fully aligned with the current implementation.
+- Removed exposure descriptions for deprecated tool categories.
+- Added AI client adaptation and configuration sections.
+- Kept current repository facts (`Vue + Element Plus + Vite` + `tsc`).
+
+## Upstream
 
 - Upstream: `https://github.com/DaxianLee/cocos-mcp-server`
-- This fork is maintained for CreatorFramework-specific iteration and stability work.
-- If docs differ, treat this fork's code and README as the source of truth.
-
-## License
-
-Follows upstream license and usage constraints.
+- If docs differ, this repository code and docs are the source of truth.

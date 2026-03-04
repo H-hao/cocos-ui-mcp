@@ -3,96 +3,157 @@ import { ToolDefinition, ToolResponse, ToolExecutor, SceneInfo } from '../types'
 export class SceneTools implements ToolExecutor {
     getTools(): ToolDefinition[] {
         return [
+            // 1. Scene Management - Basic operations
             {
-                name: 'get_current_scene',
-                description: 'Get current scene information',
-                inputSchema: {
-                    type: 'object',
-                    properties: {}
-                }
-            },
-            {
-                name: 'get_scene_list',
-                description: 'Get all scenes in the project',
-                inputSchema: {
-                    type: 'object',
-                    properties: {}
-                }
-            },
-            {
-                name: 'open_scene',
-                description: 'Open a scene by path',
+                name: 'scene_management',
+                description: 'SCENE MANAGEMENT: Core scene operations for project workflow. COMMON TASKS: get_current for active scene info, get_list to see all scenes, open to switch scenes, save to persist changes, create for new scenes. WORKFLOW: Always save before switching scenes to avoid data loss.',
                 inputSchema: {
                     type: 'object',
                     properties: {
+                        action: {
+                            type: 'string',
+                            enum: ['get_current', 'get_list', 'open', 'save', 'create', 'save_as', 'close'],
+                            description: 'Scene operation: "get_current" = active scene details | "get_list" = all project scenes | "open" = switch to scene (requires scenePath) | "save" = save current changes | "create" = new scene file (requires sceneName+savePath) | "save_as" = copy scene (requires path) | "close" = close active scene'
+                        },
+                        // For open action
                         scenePath: {
                             type: 'string',
-                            description: 'The scene file path'
-                        }
-                    },
-                    required: ['scenePath']
-                }
-            },
-            {
-                name: 'save_scene',
-                description: 'Save current scene',
-                inputSchema: {
-                    type: 'object',
-                    properties: {}
-                }
-            },
-            {
-                name: 'create_scene',
-                description: 'Create a new scene asset',
-                inputSchema: {
-                    type: 'object',
-                    properties: {
+                            description: 'Scene file path to open (REQUIRED for open action). Use Cocos asset URLs. Examples: "db://assets/scenes/Game.scene", "db://assets/levels/Level1.scene". Get paths from get_list action first.'
+                        },
+                        // For create action
                         sceneName: {
                             type: 'string',
-                            description: 'Name of the new scene'
+                            description: 'New scene name (REQUIRED for create action). Use descriptive names without extension. Examples: "MainMenu", "GameLevel1", "Settings". System adds .scene extension automatically.'
                         },
                         savePath: {
                             type: 'string',
-                            description: 'Path to save the scene (e.g., db://assets/scenes/NewScene.scene)'
-                        }
-                    },
-                    required: ['sceneName', 'savePath']
-                }
-            },
-            {
-                name: 'save_scene_as',
-                description: 'Save scene as new file',
-                inputSchema: {
-                    type: 'object',
-                    properties: {
+                            description: 'Save location for new scene (REQUIRED for create action). Must include .scene extension. Examples: "db://assets/scenes/Tutorial.scene", "db://assets/levels/BossLevel.scene".'
+                        },
+                        // For save_as action
                         path: {
                             type: 'string',
-                            description: 'Path to save the scene'
+                            description: 'Destination path for scene copy (REQUIRED for save_as action). Creates duplicate of current scene. Examples: "db://assets/scenes/GameBackup.scene", "db://assets/versions/v1_Game.scene".'
                         }
                     },
-                    required: ['path']
+                    required: ['action']
                 }
             },
+
+            // 2. Scene Hierarchy - Get scene structure
             {
-                name: 'close_scene',
-                description: 'Close current scene',
-                inputSchema: {
-                    type: 'object',
-                    properties: {}
-                }
-            },
-            {
-                name: 'get_scene_hierarchy',
-                description: 'Get the complete hierarchy of current scene',
+                name: 'scene_hierarchy',
+                description: 'SCENE HIERARCHY: Get the complete hierarchy of current scene with optional component information. Use this to inspect scene structure.',
                 inputSchema: {
                     type: 'object',
                     properties: {
                         includeComponents: {
                             type: 'boolean',
-                            description: 'Include component information',
+                            description: 'Show component details in hierarchy output. true = full information including component types and properties (detailed but verbose), false = basic structure only (faster, cleaner output). Recommended: false for overview, true for analysis.',
                             default: false
                         }
                     }
+                }
+            },
+
+            // 3. Scene Execution Control - Execute scripts and methods
+            {
+                name: 'scene_execution_control',
+                description: 'EXECUTION CONTROL: Execute component methods, scene scripts, or restore prefab instances. Use this for running custom logic and managing prefab synchronization.',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        action: {
+                            type: 'string',
+                            enum: ['execute_component_method', 'execute_scene_script', 'restore_prefab'],
+                            description: 'Action: "execute_component_method" = call method on component | "execute_scene_script" = run scene plugin method | "restore_prefab" = sync prefab instance'
+                        },
+                        // For execute_component_method action
+                        uuid: {
+                            type: 'string',
+                            description: 'Component UUID to execute method on (execute_component_method action only). Get from component tools.'
+                        },
+                        name: {
+                            type: 'string',
+                            description: 'Method name to execute. For execute_component_method: component method name. For execute_scene_script: plugin name'
+                        },
+                        method: {
+                            type: 'string',
+                            description: 'Script method name to call (execute_scene_script action only)'
+                        },
+                        args: {
+                            type: 'array',
+                            description: 'Arguments to pass to the method. Each element will be passed as a parameter to the method call.',
+                            default: []
+                        },
+                        // For restore_prefab action
+                        nodeUuid: {
+                            type: 'string',
+                            description: 'Prefab instance node UUID (restore_prefab action only). The node that should be synchronized with its prefab.'
+                        },
+                        assetUuid: {
+                            type: 'string',
+                            description: 'Prefab asset UUID (restore_prefab action only). The source prefab to restore from.'
+                        }
+                    },
+                    required: ['action']
+                }
+            },
+
+            // 4. Scene State Management - Snapshots and undo/redo
+            {
+                name: 'scene_state_management',
+                description: 'STATE MANAGEMENT: Create snapshots, manage undo/redo operations, and control scene reload. Use this for version control and state tracking.',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        action: {
+                            type: 'string',
+                            enum: ['create_snapshot', 'abort_snapshot', 'begin_undo', 'end_undo', 'cancel_undo', 'soft_reload'],
+                            description: 'Action: "create_snapshot" = save scene state | "abort_snapshot" = cancel snapshot | "begin_undo" = start recording | "end_undo" = finish recording | "cancel_undo" = cancel recording | "soft_reload" = reload scene'
+                        },
+                        // For undo operations
+                        nodeUuid: {
+                            type: 'string',
+                            description: 'Node UUID to record for undo (begin_undo action only). Changes to this node will be tracked.'
+                        },
+                        undoId: {
+                            type: 'string',
+                            description: 'Undo recording ID from begin_undo operation (end_undo/cancel_undo actions only). Used to identify which recording to complete or cancel.'
+                        }
+                    },
+                    required: ['action']
+                }
+            },
+
+            // 5. Scene Query System - Scene status and information
+            {
+                name: 'scene_query_system',
+                description: 'QUERY SYSTEM: Get scene status, available classes/components, and find nodes by asset usage. Use this for scene inspection and analysis.',
+                inputSchema: {
+                    type: 'object',
+                    properties: {
+                        action: {
+                            type: 'string',
+                            enum: ['check_ready', 'check_dirty', 'list_classes', 'list_components', 'check_script', 'find_nodes_by_asset'],
+                            description: 'Action: "check_ready" = is scene ready | "check_dirty" = has unsaved changes | "list_classes" = get registered classes | "list_components" = get available components | "check_script" = verify script exists | "find_nodes_by_asset" = find nodes using asset'
+                        },
+                        // For list_classes action
+                        extends: {
+                            type: 'string',
+                            description: 'Filter classes that extend this base class (list_classes action only). Example: "cc.Component" shows all component classes'
+                        },
+                        // For check_script action
+                        className: {
+                            type: 'string',
+                            description: 'Script class name to verify (check_script action only). Example: "PlayerController"'
+                        },
+                        // For find_nodes_by_asset action
+                        assetUuid: {
+                            type: 'string',
+                            description: 'Asset UUID to search for usage (find_nodes_by_asset action only). Get UUID from asset tools.'
+                        }
+                    },
+                    required: ['action']
                 }
             }
         ];
@@ -100,24 +161,19 @@ export class SceneTools implements ToolExecutor {
 
     async execute(toolName: string, args: any): Promise<ToolResponse> {
         switch (toolName) {
-            case 'get_current_scene':
-                return await this.getCurrentScene();
-            case 'get_scene_list':
-                return await this.getSceneList();
-            case 'open_scene':
-                return await this.openScene(args.scenePath);
-            case 'save_scene':
-                return await this.saveScene();
-            case 'create_scene':
-                return await this.createScene(args.sceneName, args.savePath);
-            case 'save_scene_as':
-                return await this.saveSceneAs(args.path);
-            case 'close_scene':
-                return await this.closeScene();
-            case 'get_scene_hierarchy':
+            case 'scene_management':
+                return await this.handleSceneManagement(args);
+            case 'scene_hierarchy':
                 return await this.getSceneHierarchy(args.includeComponents);
+            case 'scene_execution_control':
+                return await this.handleExecutionControl(args);
+            case 'scene_state_management':
+                return await this.handleStateManagement(args);
+            case 'scene_query_system':
+                return await this.handleQuerySystem(args);
             default:
-                throw new Error(`Unknown tool: ${toolName}`);
+                // Handle legacy tool names for backward compatibility
+                return await this.handleLegacyTools(toolName, args);
         }
     }
 
@@ -478,5 +534,319 @@ export class SceneTools implements ToolExecutor {
                 resolve({ success: false, error: err.message });
             });
         });
+    }
+
+    private async executeComponentMethod(uuid: string, name: string, args: any[]): Promise<ToolResponse> {
+        return new Promise((resolve) => {
+            Editor.Message.request('scene', 'execute-component-method', {
+                uuid: uuid,
+                name: name,
+                args: args
+            }).then((result: any) => {
+                resolve({ 
+                    success: true, 
+                    data: result, 
+                    message: `Component method ${name} executed successfully` 
+                });
+            }).catch((err: Error) => {
+                resolve({ success: false, error: err.message });
+            });
+        });
+    }
+
+    private async executeSceneScript(name: string, method: string, args: any[]): Promise<ToolResponse> {
+        return new Promise((resolve) => {
+            Editor.Message.request('scene', 'execute-scene-script', {
+                name: name,
+                method: method,
+                args: args
+            }).then((result: any) => {
+                resolve({ 
+                    success: true, 
+                    data: result, 
+                    message: `Scene script ${name}.${method} executed successfully` 
+                });
+            }).catch((err: Error) => {
+                resolve({ success: false, error: err.message });
+            });
+        });
+    }
+
+    private async restorePrefab(nodeUuid: string, assetUuid: string): Promise<ToolResponse> {
+        return new Promise((resolve) => {
+            (Editor.Message.request as any)('scene', 'restore-prefab', nodeUuid, assetUuid).then((result: any) => {
+                resolve({ success: true, data: result });
+            }).catch((err: Error) => {
+                resolve({ success: false, error: err.message });
+            });
+        });
+    }
+
+    private async sceneSnapshot(): Promise<ToolResponse> {
+        return new Promise((resolve) => {
+            Editor.Message.request('scene', 'snapshot').then((result: any) => {
+                resolve({ 
+                    success: true, 
+                    data: result, 
+                    message: 'Scene snapshot created successfully' 
+                });
+            }).catch((err: Error) => {
+                resolve({ success: false, error: err.message });
+            });
+        });
+    }
+
+    private async sceneSnapshotAbort(): Promise<ToolResponse> {
+        return new Promise((resolve) => {
+            Editor.Message.request('scene', 'snapshot-abort').then(() => {
+                resolve({ success: true, message: 'Scene snapshot aborted' });
+            }).catch((err: Error) => {
+                resolve({ success: false, error: err.message });
+            });
+        });
+    }
+
+    private async beginUndoRecording(nodeUuid: string): Promise<ToolResponse> {
+        return new Promise((resolve) => {
+            Editor.Message.request('scene', 'begin-recording', nodeUuid).then((undoId: string) => {
+                resolve({ 
+                    success: true, 
+                    data: { undoId, nodeUuid }, 
+                    message: `Undo recording started for node ${nodeUuid}` 
+                });
+            }).catch((err: Error) => {
+                resolve({ success: false, error: err.message });
+            });
+        });
+    }
+
+    private async endUndoRecording(undoId: string): Promise<ToolResponse> {
+        return new Promise((resolve) => {
+            Editor.Message.request('scene', 'end-recording', undoId).then(() => {
+                resolve({ 
+                    success: true, 
+                    data: { undoId }, 
+                    message: 'Undo recording ended successfully' 
+                });
+            }).catch((err: Error) => {
+                resolve({ success: false, error: err.message });
+            });
+        });
+    }
+
+    private async cancelUndoRecording(undoId: string): Promise<ToolResponse> {
+        return new Promise((resolve) => {
+            Editor.Message.request('scene', 'cancel-recording', undoId).then(() => {
+                resolve({ 
+                    success: true, 
+                    data: { undoId }, 
+                    message: 'Undo recording cancelled successfully' 
+                });
+            }).catch((err: Error) => {
+                resolve({ success: false, error: err.message });
+            });
+        });
+    }
+
+    private async softReloadScene(): Promise<ToolResponse> {
+        return new Promise((resolve) => {
+            Editor.Message.request('scene', 'soft-reload').then(() => {
+                resolve({ success: true, message: 'Scene soft reloaded successfully' });
+            }).catch((err: Error) => {
+                resolve({ success: false, error: err.message });
+            });
+        });
+    }
+
+    private async querySceneReady(): Promise<ToolResponse> {
+        return new Promise((resolve) => {
+            Editor.Message.request('scene', 'query-is-ready').then((result: any) => {
+                resolve({ success: true, data: { isReady: result }, message: `Scene ready status: ${result}` });
+            }).catch((err: Error) => {
+                resolve({ success: false, error: err.message });
+            });
+        });
+    }
+
+    private async querySceneDirty(): Promise<ToolResponse> {
+        return new Promise((resolve) => {
+            Editor.Message.request('scene', 'query-dirty').then((result: any) => {
+                resolve({ success: true, data: { isDirty: result }, message: `Scene dirty status: ${result}` });
+            }).catch((err: Error) => {
+                resolve({ success: false, error: err.message });
+            });
+        });
+    }
+
+    private async querySceneClasses(extendsClass: string | undefined): Promise<ToolResponse> {
+        return new Promise((resolve) => {
+            Editor.Message.request('scene', 'query-classes', {}).then((result: any) => {
+                // Filter by extends class if provided
+                let classes = result;
+                if (extendsClass) {
+                    classes = result.filter((cls: any) => cls.extends === extendsClass);
+                }
+                resolve({ 
+                    success: true, 
+                    data: { classes, total: classes.length }, 
+                    message: `Found ${classes.length} classes${extendsClass ? ` extending ${extendsClass}` : ''}` 
+                });
+            }).catch((err: Error) => {
+                resolve({ success: false, error: err.message });
+            });
+        });
+    }
+
+    private async querySceneComponents(): Promise<ToolResponse> {
+        return new Promise((resolve) => {
+            Editor.Message.request('scene', 'query-components').then((result: any) => {
+                resolve({ 
+                    success: true, 
+                    data: { components: result, total: result.length }, 
+                    message: `Found ${result.length} components in scene` 
+                });
+            }).catch((err: Error) => {
+                resolve({ success: false, error: err.message });
+            });
+        });
+    }
+
+    private async queryComponentHasScript(className: string): Promise<ToolResponse> {
+        return new Promise((resolve) => {
+            Editor.Message.request('scene', 'query-component-has-script', className).then((result: any) => {
+                resolve({ 
+                    success: true, 
+                    data: { hasScript: result, className }, 
+                    message: `Script ${className} ${result ? 'exists' : 'does not exist'} in component list` 
+                });
+            }).catch((err: Error) => {
+                resolve({ success: false, error: err.message });
+            });
+        });
+    }
+
+    private async queryNodesByAssetUuid(assetUuid: string): Promise<ToolResponse> {
+        return new Promise((resolve) => {
+            Editor.Message.request('scene', 'query-nodes-by-asset-uuid', assetUuid).then((result: any) => {
+                resolve({ 
+                    success: true, 
+                    data: { nodeUuids: result, assetUuid, count: result.length }, 
+                    message: `Found ${result.length} nodes using asset ${assetUuid}` 
+                });
+            }).catch((err: Error) => {
+                resolve({ success: false, error: err.message });
+            });
+        });
+    }
+
+    // New handler methods
+    private async handleSceneManagement(args: any): Promise<ToolResponse> {
+        const { action } = args;
+        
+        switch (action) {
+            case 'get_current':
+                return await this.getCurrentScene();
+            case 'get_list':
+                return await this.getSceneList();
+            case 'open':
+                return await this.openScene(args.scenePath);
+            case 'save':
+                return await this.saveScene();
+            case 'create':
+                return await this.createScene(args.sceneName, args.savePath);
+            case 'save_as':
+                return await this.saveSceneAs(args.path);
+            case 'close':
+                return await this.closeScene();
+            default:
+                return { success: false, error: `Unknown scene management action: ${action}` };
+        }
+    }
+
+    private async handleExecutionControl(args: any): Promise<ToolResponse> {
+        const { action } = args;
+        
+        switch (action) {
+            case 'execute_component_method':
+                return await this.executeComponentMethod(args.uuid, args.name, args.args);
+            case 'execute_scene_script':
+                return await this.executeSceneScript(args.name, args.method, args.args);
+            case 'restore_prefab':
+                return await this.restorePrefab(args.nodeUuid, args.assetUuid);
+            default:
+                return { success: false, error: `Unknown execution control action: ${action}` };
+        }
+    }
+
+    private async handleStateManagement(args: any): Promise<ToolResponse> {
+        const { action } = args;
+        
+        switch (action) {
+            case 'create_snapshot':
+                return await this.sceneSnapshot();
+            case 'abort_snapshot':
+                return await this.sceneSnapshotAbort();
+            case 'begin_undo':
+                return await this.beginUndoRecording(args.nodeUuid);
+            case 'end_undo':
+                return await this.endUndoRecording(args.undoId);
+            case 'cancel_undo':
+                return await this.cancelUndoRecording(args.undoId);
+            case 'soft_reload':
+                return await this.softReloadScene();
+            default:
+                return { success: false, error: `Unknown state management action: ${action}` };
+        }
+    }
+
+    private async handleQuerySystem(args: any): Promise<ToolResponse> {
+        const { action } = args;
+        
+        switch (action) {
+            case 'check_ready':
+                return await this.querySceneReady();
+            case 'check_dirty':
+                return await this.querySceneDirty();
+            case 'list_classes':
+                return await this.querySceneClasses(args.extends);
+            case 'list_components':
+                return await this.querySceneComponents();
+            case 'check_script':
+                return await this.queryComponentHasScript(args.className);
+            case 'find_nodes_by_asset':
+                return await this.queryNodesByAssetUuid(args.assetUuid);
+            default:
+                return { success: false, error: `Unknown query system action: ${action}` };
+        }
+    }
+
+    // Legacy tool support for backward compatibility
+    private async handleLegacyTools(toolName: string, args: any): Promise<ToolResponse> {
+        switch (toolName) {
+            case 'get_current_scene':
+                return await this.getCurrentScene();
+            case 'get_scene_list':
+                return await this.getSceneList();
+            case 'open_scene':
+                return await this.openScene(args.scenePath);
+            case 'save_scene':
+                return await this.saveScene();
+            case 'create_scene':
+                return await this.createScene(args.sceneName, args.savePath);
+            case 'save_scene_as':
+                return await this.saveSceneAs(args.path);
+            case 'close_scene':
+                return await this.closeScene();
+            case 'get_scene_hierarchy':
+                return await this.getSceneHierarchy(args.includeComponents);
+            case 'scene_execution_control':
+                return await this.handleExecutionControl(args);
+            case 'scene_state_management':
+                return await this.handleStateManagement(args);
+            case 'scene_query_system':
+                return await this.handleQuerySystem(args);
+            default:
+                return { success: false, error: `Unknown tool: ${toolName}` };
+        }
     }
 }
