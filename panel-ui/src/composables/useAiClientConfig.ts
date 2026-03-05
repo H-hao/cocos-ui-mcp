@@ -15,6 +15,8 @@ import type {
     AiClientStatus,
     AiClientType,
     MCPServerConfigPayload,
+    OperationLogEntry,
+    OperationLogType,
 } from '../types/contracts';
 
 const CLIENT_META: Array<{ type: AiClientType; name: string; isIDE: boolean; isAutoConfig: boolean }> = [
@@ -48,6 +50,7 @@ export function useAiClientConfig() {
     const generatedClientConfig = ref('');
     const generatedCliCommands = ref({ claude: '', gemini: '' });
     const batchResults = ref<Record<string, string>>({});
+    const configLogs = ref<OperationLogEntry[]>([]);
 
     const loadingStatus = ref(false);
     const loadingBatch = ref(false);
@@ -77,6 +80,25 @@ export function useAiClientConfig() {
         ].join('\n');
     });
 
+    function getLogTime() {
+        const now = new Date();
+        const hh = String(now.getHours()).padStart(2, '0');
+        const mm = String(now.getMinutes()).padStart(2, '0');
+        const ss = String(now.getSeconds()).padStart(2, '0');
+        return `${hh}:${mm}:${ss}`;
+    }
+
+    function addConfigLog(message: string, type: OperationLogType = 'info') {
+        configLogs.value.unshift({
+            time: getLogTime(),
+            message,
+            type,
+        });
+        if (configLogs.value.length > 50) {
+            configLogs.value = configLogs.value.slice(0, 50);
+        }
+    }
+
     function setServerPort(port: number) {
         const numericPort = Number(port);
         if (!Number.isFinite(numericPort)) {
@@ -86,12 +108,15 @@ export function useAiClientConfig() {
         serverPort.value = nextPort;
     }
 
-    async function copyText(text: string, successText: string) {
+    async function copyText(text: string, successText: string, logText?: string) {
         try {
             await navigator.clipboard.writeText(text);
             notifySuccess(successText);
+            addConfigLog(logText || successText, 'success');
         } catch (error) {
-            notifyError(`复制失败：${toErrorMessage(error)}`);
+            const errorMessage = toErrorMessage(error);
+            notifyError(`复制失败：${errorMessage}`);
+            addConfigLog(`复制失败：${errorMessage}`, 'error');
         }
     }
 
@@ -112,7 +137,9 @@ export function useAiClientConfig() {
             }
             clients.value = mergeClients(result.clients || []);
         } catch (error) {
-            notifyError(`读取 AI 客户端状态失败：${toErrorMessage(error)}`);
+            const errorMessage = toErrorMessage(error);
+            notifyError(`读取 AI 客户端状态失败：${errorMessage}`);
+            addConfigLog(`读取 AI 客户端状态失败：${errorMessage}`, 'error');
             clients.value = mergeClients([]);
         } finally {
             loadingStatus.value = false;
@@ -128,8 +155,11 @@ export function useAiClientConfig() {
             }
             generatedCliCommands.value = result.commands;
             notifySuccess('CLI 命令已生成');
+            addConfigLog('CLI 命令已生成', 'success');
         } catch (error) {
-            notifyError(`生成命令失败：${toErrorMessage(error)}`);
+            const errorMessage = toErrorMessage(error);
+            notifyError(`生成命令失败：${errorMessage}`);
+            addConfigLog(`生成命令失败：${errorMessage}`, 'error');
         } finally {
             loadingGenerate.value = false;
         }
@@ -145,8 +175,11 @@ export function useAiClientConfig() {
             }
             generatedClientConfig.value = result.content;
             notifySuccess(`已生成 ${clientType} 配置内容`);
+            addConfigLog(`已生成 ${clientType} 配置内容`, 'success');
         } catch (error) {
-            notifyError(`生成配置失败：${toErrorMessage(error)}`);
+            const errorMessage = toErrorMessage(error);
+            notifyError(`生成配置失败：${errorMessage}`);
+            addConfigLog(`生成配置失败：${errorMessage}`, 'error');
         } finally {
             loadingGenerate.value = false;
         }
@@ -160,9 +193,12 @@ export function useAiClientConfig() {
                 throw new Error(result.message);
             }
             notifySuccess(result.message);
+            addConfigLog(result.message, 'success');
             await refreshStatus();
         } catch (error) {
-            notifyError(`写入失败：${toErrorMessage(error)}`);
+            const errorMessage = toErrorMessage(error);
+            notifyError(`写入失败：${errorMessage}`);
+            addConfigLog(`写入失败：${errorMessage}`, 'error');
         } finally {
             operatingClient.value = '';
         }
@@ -176,9 +212,12 @@ export function useAiClientConfig() {
                 throw new Error(result.message);
             }
             notifySuccess(result.message);
+            addConfigLog(result.message, 'success');
             await refreshStatus();
         } catch (error) {
-            notifyError(`移除失败：${toErrorMessage(error)}`);
+            const errorMessage = toErrorMessage(error);
+            notifyError(`移除失败：${errorMessage}`);
+            addConfigLog(`移除失败：${errorMessage}`, 'error');
         } finally {
             operatingClient.value = '';
         }
@@ -193,9 +232,14 @@ export function useAiClientConfig() {
             }
             batchResults.value = result.results || {};
             notifySuccess('批量写入完成');
+            for (const [clientName, message] of Object.entries(batchResults.value)) {
+                addConfigLog(`${clientName}: ${message}`, 'info');
+            }
             await refreshStatus();
         } catch (error) {
-            notifyError(`批量写入失败：${toErrorMessage(error)}`);
+            const errorMessage = toErrorMessage(error);
+            notifyError(`批量写入失败：${errorMessage}`);
+            addConfigLog(`批量写入失败：${errorMessage}`, 'error');
         } finally {
             loadingBatch.value = false;
         }
@@ -210,9 +254,14 @@ export function useAiClientConfig() {
             }
             batchResults.value = result.results || {};
             notifySuccess('批量移除完成');
+            for (const [clientName, message] of Object.entries(batchResults.value)) {
+                addConfigLog(`${clientName}: ${message}`, 'info');
+            }
             await refreshStatus();
         } catch (error) {
-            notifyError(`批量移除失败：${toErrorMessage(error)}`);
+            const errorMessage = toErrorMessage(error);
+            notifyError(`批量移除失败：${errorMessage}`);
+            addConfigLog(`批量移除失败：${errorMessage}`, 'error');
         } finally {
             loadingBatch.value = false;
         }
@@ -229,8 +278,11 @@ export function useAiClientConfig() {
                 throw new Error(result.message);
             }
             notifySuccess(result.message);
+            addConfigLog(result.message, 'success');
         } catch (error) {
-            notifyError(`打开配置文件失败：${toErrorMessage(error)}`);
+            const errorMessage = toErrorMessage(error);
+            notifyError(`打开配置文件失败：${errorMessage}`);
+            addConfigLog(`打开配置文件失败：${errorMessage}`, 'error');
         }
     }
 
@@ -249,6 +301,7 @@ export function useAiClientConfig() {
         generatedCliCommands,
         cliCommandsText,
         batchResults,
+        configLogs,
         loadingStatus,
         loadingBatch,
         loadingGenerate,

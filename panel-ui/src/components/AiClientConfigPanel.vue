@@ -19,6 +19,7 @@ const {
     generatedClientConfig,
     cliCommandsText,
     batchResults,
+    configLogs,
     loadingStatus,
     loadingBatch,
     loadingGenerate,
@@ -173,7 +174,7 @@ function isClientOperating(clientType: AiClientType) {
                     <h4>CLI 命令</h4>
                     <div class="output-actions">
                         <el-button size="small" :loading="loadingGenerate" @click="void generateCommands()">生成命令</el-button>
-                        <el-button size="small" @click="void copyText(cliCommandsText, 'CLI 命令已复制')">复制</el-button>
+                        <el-button size="small" @click="void copyText(cliCommandsText, 'CLI 命令已复制', '已复制 CLI 命令到剪贴板')">复制</el-button>
                     </div>
                 </div>
                 <el-input :model-value="cliCommandsText" type="textarea" :rows="10" readonly />
@@ -190,7 +191,10 @@ function isClientOperating(clientType: AiClientType) {
                             @click="void generateConfigPreview(selectedClient)">
                             生成
                         </el-button>
-                        <el-button size="small" @click="void copyText(generatedClientConfig || '', '配置内容已复制')">复制</el-button>
+                        <el-button size="small"
+                            @click="void copyText(generatedClientConfig || '', '配置内容已复制', `已复制 ${selectedClient} 配置内容到剪贴板`)">
+                            复制
+                        </el-button>
                     </div>
                 </div>
                 <el-input :model-value="generatedClientConfig" type="textarea" :rows="10" readonly />
@@ -203,6 +207,17 @@ function isClientOperating(clientType: AiClientType) {
                 <el-tag v-for="[clientName, message] in batchResultEntries" :key="clientName" effect="plain">
                     {{ clientName }}: {{ message }}
                 </el-tag>
+            </div>
+        </el-card>
+
+        <el-card class="console-card" shadow="never">
+            <h4 class="mb-2 text-sm font-medium">操作日志</h4>
+            <div class="config-log-container">
+                <div v-for="(log, index) in configLogs" :key="`${log.time}-${index}`" class="log-item" :class="log.type">
+                    <span class="log-time">{{ log.time }}</span>
+                    <span class="log-message">{{ log.message }}</span>
+                </div>
+                <div v-if="configLogs.length === 0" class="log-empty">暂无操作记录</div>
             </div>
         </el-card>
     </div>
@@ -309,6 +324,61 @@ function isClientOperating(clientType: AiClientType) {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
+}
+
+.config-log-container {
+    max-height: 220px;
+    overflow-y: auto;
+    border: 1px solid var(--el-border-color);
+    border-radius: 8px;
+    padding: 8px;
+    background: var(--el-fill-color-light);
+}
+
+.log-item {
+    display: flex;
+    gap: 10px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    margin-bottom: 6px;
+}
+
+.log-item:last-child {
+    margin-bottom: 0;
+}
+
+.log-item.info {
+    color: var(--el-color-info-dark-2);
+    background: var(--el-color-info-light-9);
+}
+
+.log-item.success {
+    color: var(--el-color-success-dark-2);
+    background: var(--el-color-success-light-9);
+}
+
+.log-item.error {
+    color: var(--el-color-error-dark-2);
+    background: var(--el-color-error-light-9);
+}
+
+.log-time {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-weight: 600;
+    min-width: 64px;
+}
+
+.log-message {
+    flex: 1;
+    word-break: break-word;
+}
+
+.log-empty {
+    padding: 16px;
+    text-align: center;
+    color: var(--el-text-color-secondary);
+    font-size: 12px;
 }
 
 @media (max-width: 980px) {

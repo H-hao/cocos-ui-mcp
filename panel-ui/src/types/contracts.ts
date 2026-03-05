@@ -51,6 +51,14 @@ export interface AiClientStatus {
     isAutoConfig: boolean;
 }
 
+export type OperationLogType = 'info' | 'success' | 'error';
+
+export interface OperationLogEntry {
+    time: string;
+    message: string;
+    type: OperationLogType;
+}
+
 export interface MCPServerConfigPayload {
     serverName: string;
     serverUrl: string;
