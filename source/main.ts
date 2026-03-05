@@ -167,8 +167,8 @@ export const methods: { [key: string]: (...any: any) => any } = {
     },
 
     /**
-     * @en Restart server with latest dist/mcp-server.js
-     * @zh 使用最新 dist/mcp-server.js 热重启服务器
+     * @en Restart server with latest dist/mcp-server.js, then close and reopen the panel
+     * @zh 使用最新 dist/mcp-server.js 热重启服务器，并关闭/重新打开面板以加载最新 UI
      */
     async restartServerFromDist() {
         const previousCtor = MCPServerCtor;
@@ -178,6 +178,12 @@ export const methods: { [key: string]: (...any: any) => any } = {
         try {
             reloadServerConstructorFromDist();
             await recreateServer(previousSettings, true);
+
+            // 关闭面板后短暂延迟再重新打开，确保新 dist 的 UI 被加载
+            Editor.Panel.close('ben-cocos-mcp');
+            await new Promise<void>(resolve => setTimeout(resolve, 400));
+            Editor.Panel.open('ben-cocos-mcp');
+
             return {
                 success: true,
                 running: true,
