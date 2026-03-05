@@ -104,7 +104,7 @@ function isClientOperating(clientType: AiClientType) {
                         <el-input v-model="serverName" placeholder="cocos-creator" />
                     </el-form-item>
                     <el-form-item label="服务器 URL">
-                        <el-input :model-value="serverUrl" readonly />
+                        <el-input :model-value="serverUrl" readonly class="url-readonly-input" />
                     </el-form-item>
                     <el-form-item label="CLI scope">
                         <el-select v-model="scope" class="w-full" :teleported="false">
@@ -324,5 +324,16 @@ function isClientOperating(clientType: AiClientType) {
         align-items: flex-start;
         flex-direction: column;
     }
+}
+
+.url-readonly-input :deep(.el-input__wrapper) {
+    background-color: var(--el-disabled-bg-color, #f5f7fa);
+    cursor: not-allowed;
+    box-shadow: 0 0 0 1px var(--el-disabled-border-color, #e4e7ed) inset;
+}
+
+.url-readonly-input :deep(.el-input__inner) {
+    color: var(--el-text-color-secondary);
+    cursor: not-allowed;
 }
 </style>
