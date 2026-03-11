@@ -82,6 +82,7 @@ export class SceneTools implements ToolExecutor {
                         },
                         args: {
                             type: 'array',
+                            items: {},
                             description: 'Arguments to pass to the method. Each element will be passed as a parameter to the method call.',
                             default: []
                         },
