@@ -68,7 +68,7 @@ export class ComponentTools implements ToolExecutor {
                         },
                         componentType: {
                             type: 'string',
-                            description: 'Component type identifier (REQUIRED). BUILT-IN: "cc.Label", "cc.Sprite", "cc.Button", "cc.UITransform". SCRIPTS: Use compressed UUID format like "3b6be0raOhG54eGN2c5M4cN" (get from component_query). CRITICAL: Use exact type string from component_query list action!'
+                            description: 'Component type identifier (REQUIRED). BUILT-IN: "cc.Label", "cc.Sprite", "cc.Button", "cc.UITransform". CUSTOM SCRIPTS: Must use the compressed UUID hash (e.g. "3b6be0raOhG54eGN2c5M4cN") returned by component_query (list action) in the "type" field — DO NOT use the human-readable class name (e.g. "MyScript"), it will NOT match. CRITICAL: Always call component_query first and copy the exact "type" string from its response!'
                         },
                         // 支持单个属性设置的旧格式（向后兼容）
                         property: {
@@ -77,7 +77,7 @@ export class ComponentTools implements ToolExecutor {
                         },
                         propertyType: {
                             type: 'string',
-                            description: 'Property data type (REQUIRED for single property setting). Use component_query to inspect the property and determine its exact type. CRITICAL: Must match actual property type exactly or setting will fail! No automatic detection available.',
+                            description: 'Property data type (REQUIRED for single property setting). ⚠️ TYPE MAPPING: component_query returns engine type names (e.g. "cc.Node", "cc.Prefab"), but this parameter requires the SHORT form. Mapping: cc.Node → "node", cc.Prefab → "prefab", cc.SpriteFrame → "spriteFrame", cc.Component/subclasses → "component", cc.Asset → "asset". For primitives: String → "string", Number/Float → "number", Boolean → "boolean". CRITICAL: Do NOT pass "cc.Node" — use "node" instead!',
                             enum: [
                                 'string', 'number', 'boolean', 'integer', 'float',
                                 'color', 'vec2', 'vec3', 'size',
@@ -86,7 +86,7 @@ export class ComponentTools implements ToolExecutor {
                             ]
                         },
                         value: {
-                            description: 'Property value - format depends on propertyType. STRING: "Hello World", NUMBER: 42, BOOLEAN: true/false, COLOR: {"r":255,"g":0,"b":0,"a":255} or "#FF0000", VEC2: {"x":100,"y":50}, SIZE: {"width":200,"height":100}, NODE/ASSET: "uuid-string", ARRAYS: [...values]. See examples in properties description.'
+                            description: 'Property value - format depends on propertyType. STRING: "Hello World", NUMBER: 42, BOOLEAN: true/false, COLOR: {"r":255,"g":0,"b":0,"a":255} or "#FF0000", VEC2: {"x":100,"y":50}, SIZE: {"width":200,"height":100}, NODE: "target-node-uuid" (the node UUID to reference), COMPONENT: "target-node-uuid" (pass the NODE UUID that owns the component — the tool auto-resolves the matching component type on that node; do NOT pass a component UUID), PREFAB/ASSET/SPRITEFRAME: "asset-uuid" (the asset resource UUID from asset_query), ARRAYS: [...values].'
                         },
                         // 新的批量属性设置格式
                         properties: {
@@ -103,10 +103,15 @@ export class ComponentTools implements ToolExecutor {
                                 '• BOOLEANS: {"isBold": {"type": "boolean", "value": true}}\n' +
                                 '• VECTORS: {"anchorPoint": {"type": "vec2", "value": {"x":0.5,"y":1.0}}}\n' +
                                 '• SIZES: {"contentSize": {"type": "size", "value": {"width":200,"height":80}}}\n' +
-                                '• NODE REFS: {"player": {"type": "node", "value": "node-uuid-here"}}\n' +
-                                '• ASSETS: {"bulletPrefab": {"type": "prefab", "value": "prefab-uuid-here"}}\n' +
-                                '• SPRITES: {"spriteFrame": {"type": "spriteFrame", "value": "sprite-uuid-here"}}\n\n' +
-                                '⚠️ IMPORTANT: 1) Get UUIDs from asset_query and node_query tools first! 2) Use component_query to inspect exact property types - type mismatches will cause failures!',
+                                '• NODE REFS: {"player": {"type": "node", "value": "target-node-uuid"}}\n' +
+                                '• COMPONENT REFS: {"stepper": {"type": "component", "value": "node-uuid-that-owns-the-component"}} (pass NODE UUID, tool auto-resolves the component)\n' +
+                                '• ASSETS: {"bulletPrefab": {"type": "prefab", "value": "asset-uuid-from-asset_query"}}\n' +
+                                '• SPRITES: {"spriteFrame": {"type": "spriteFrame", "value": "asset-uuid-from-asset_query"}}\n\n' +
+                                '⚠️ IMPORTANT:\n' +
+                                '1) Get node UUIDs from node_query, asset UUIDs from asset_query.\n' +
+                                '2) component_query returns engine types like "cc.Node" — map to short form: cc.Node→"node", cc.Prefab→"prefab", cc.SpriteFrame→"spriteFrame", cc.Component/subclass→"component".\n' +
+                                '3) For "component" type, value must be the NODE UUID (not the component UUID) — the tool finds the matching component automatically.\n' +
+                                '4) For custom script componentType, use the compressed UUID hash from component_query, NOT the class name!',
                             additionalProperties: {
                                 type: 'object',
                                 properties: {

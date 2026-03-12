@@ -53,6 +53,11 @@ export class PrefabTools implements ToolExecutor {
                             type: 'string',
                             description: 'Destination path for new prefab (REQUIRED for create action). Must include .prefab extension. Examples: "db://assets/prefabs/Player.prefab", "db://assets/ui/CustomButton.prefab". Ensure parent folder exists.'
                         },
+                        overwrite: {
+                            type: 'boolean',
+                            description: 'Whether to replace an existing prefab at savePath before creation. Default: true. When false, the tool returns a conflict error instead of triggering an editor confirmation dialog.',
+                            default: true
+                        },
                         prefabPath: {
                             type: 'string',
                             description: 'Prefab file to delete (REQUIRED for delete action). WARNING: This permanently removes the prefab file. Examples: "db://assets/prefabs/OldPlayer.prefab". Use prefab_browse list to find exact paths first.'
@@ -670,8 +675,16 @@ export class PrefabTools implements ToolExecutor {
                 }
 
                 const prefabName = args.prefabName || 'NewPrefab';
+                const overwrite = args.overwrite !== false;
                 const fullPath = pathParam.endsWith('.prefab') ? 
                     pathParam : `${pathParam}/${prefabName}.prefab`;
+
+                // 先处理同名文件冲突，避免 scene.create-prefab 触发编辑器确认弹窗并卡住 MCP。
+                const prepareTargetResult = await this.preparePrefabTarget(fullPath, overwrite);
+                if (!prepareTargetResult.success) {
+                    resolve(prepareTargetResult);
+                    return;
+                }
 
                 // 记录撤销操作
                 await this.recordUndoOperation('create-prefab', args.nodeUuid);
@@ -718,6 +731,63 @@ export class PrefabTools implements ToolExecutor {
                 });
             }
         });
+    }
+
+    private async queryAssetInfoSafe(assetPath: string): Promise<any | null> {
+        try {
+            return await Editor.Message.request('asset-db', 'query-asset-info', assetPath);
+        } catch (error) {
+            return null;
+        }
+    }
+
+    private async assetExists(assetPath: string): Promise<boolean> {
+        const assetInfo = await this.queryAssetInfoSafe(assetPath);
+        return !!assetInfo?.uuid;
+    }
+
+    private async waitForAssetState(assetPath: string, shouldExist: boolean, timeoutMs: number = 5000, intervalMs: number = 200): Promise<void> {
+        const startTime = Date.now();
+        while (Date.now() - startTime < timeoutMs) {
+            const exists = await this.assetExists(assetPath);
+            if (exists === shouldExist) {
+                return;
+            }
+            await new Promise(resolve => setTimeout(resolve, intervalMs));
+        }
+
+        throw new Error(`Asset state did not reach expected value: ${assetPath}, shouldExist=${shouldExist}`);
+    }
+
+    private async preparePrefabTarget(prefabPath: string, overwrite: boolean): Promise<ToolResponse> {
+        const exists = await this.assetExists(prefabPath);
+        if (!exists) {
+            return { success: true, data: { overwritten: false } };
+        }
+
+        if (!overwrite) {
+            return {
+                success: false,
+                error: `Prefab already exists at ${prefabPath}. Pass overwrite=true to replace it without editor interaction.`
+            };
+        }
+
+        try {
+            await Editor.Message.request('asset-db', 'delete-asset', prefabPath);
+            await this.waitForAssetState(prefabPath, false);
+            return {
+                success: true,
+                data: {
+                    overwritten: true,
+                    prefabPath: prefabPath
+                }
+            };
+        } catch (error: any) {
+            return {
+                success: false,
+                error: `Failed to remove existing prefab before overwrite: ${error?.message || error}`
+            };
+        }
     }
 
     // 使用编辑器标准的 scene.create-prefab 方法
@@ -982,16 +1052,19 @@ export class PrefabTools implements ToolExecutor {
                     if (!args.nodeUuid || !args.prefabName || !args.savePath) {
                         return { success: false, error: 'nodeUuid, prefabName, savePath required for create' };
                     }
+                    const overwrite = args.overwrite !== false;
                     const createResult = await this.createPrefab({
                         nodeUuid: args.nodeUuid,
                         prefabName: args.prefabName,
-                        savePath: args.savePath
+                        savePath: args.savePath,
+                        overwrite: overwrite
                     });
                     if (createResult.success) {
                         return {
                             success: true,
                             data: {
                                 prefabPath: args.savePath,
+                                overwrite: overwrite,
                                 message: '✅ Prefab created'
                             }
                         };
@@ -1419,52 +1492,47 @@ export class PrefabTools implements ToolExecutor {
     }
 
     /**
-     * 使用MCP接口增强节点树，获取正确的组件信息
+     * 使用 query-node 补全节点树，保留 tree.children 作为层级真值。
      */
     private async enhanceTreeWithMCPComponents(node: any): Promise<any> {
-        if (!node || !node.uuid) {
+        if (!node) {
             return node;
         }
 
-        try {
-            // 使用MCP接口获取节点的组件信息
-            const response = await fetch('http://localhost:8585/mcp', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    "jsonrpc": "2.0",
-                    "method": "tools/call",
-                    "params": {
-                        "name": "component_get_components",
-                        "arguments": {
-                            "nodeUuid": node.uuid
-                        }
-                    },
-                    "id": Date.now()
-                })
-            });
-            
-            const mcpResult = await response.json();
-            if (mcpResult.result?.content?.[0]?.text) {
-                const componentData = JSON.parse(mcpResult.result.content[0].text);
-                if (componentData.success && componentData.data.components) {
-                    // 更新节点的组件信息为MCP返回的正确数据
-                    node.components = componentData.data.components;
-                    console.log(`节点 ${node.uuid} 获取到 ${componentData.data.components.length} 个组件，包含脚本组件的正确类型`);
+        const nodeUuid = this.extractNodeUuid(node);
+        const enhancedNode: any = {
+            ...node,
+            children: Array.isArray(node.children) ? node.children : []
+        };
+
+        if (nodeUuid) {
+            try {
+                const fullNodeData = await Editor.Message.request('scene', 'query-node', nodeUuid);
+                if (fullNodeData) {
+                    enhancedNode.uuid = nodeUuid;
+                    enhancedNode.name = fullNodeData.name ?? enhancedNode.name;
+                    enhancedNode.active = fullNodeData.active ?? enhancedNode.active;
+                    enhancedNode.layer = fullNodeData.layer ?? enhancedNode.layer;
+                    enhancedNode.position = fullNodeData.position ?? enhancedNode.position;
+                    enhancedNode.rotation = fullNodeData.rotation ?? enhancedNode.rotation;
+                    enhancedNode.scale = fullNodeData.scale ?? enhancedNode.scale;
+                    enhancedNode.components = this.extractRawComponentsFromNode(fullNodeData);
+                    console.log(`节点 ${nodeUuid} 已补全，组件数: ${enhancedNode.components.length}`);
                 }
-            }
-        } catch (error) {
-            console.warn(`获取节点 ${node.uuid} 的MCP组件信息失败:`, error);
-        }
-
-        // 递归处理子节点
-        if (node.children && Array.isArray(node.children)) {
-            for (let i = 0; i < node.children.length; i++) {
-                node.children[i] = await this.enhanceTreeWithMCPComponents(node.children[i]);
+            } catch (error) {
+                console.warn(`补全节点 ${nodeUuid} 数据失败:`, error);
             }
         }
 
-        return node;
+        for (let i = 0; i < enhancedNode.children.length; i++) {
+            enhancedNode.children[i] = await this.enhanceTreeWithMCPComponents(enhancedNode.children[i]);
+        }
+
+        if (!Array.isArray(enhancedNode.components)) {
+            enhancedNode.components = [];
+        }
+
+        return enhancedNode;
     }
 
     private async buildBasicNodeInfo(nodeUuid: string): Promise<any> {
@@ -2226,40 +2294,44 @@ export class PrefabTools implements ToolExecutor {
         }
 
         // 然后处理组件
-        if (includeComponents && nodeData.components && Array.isArray(nodeData.components)) {
-            console.log(`处理节点 ${node._name} 的 ${nodeData.components.length} 个组件`);
-            
-            const componentIndices: number[] = [];
-            for (const component of nodeData.components) {
+        const componentsToProcess = includeComponents
+            ? this.extractComponentsFromNode(nodeData)
+                .map((component) => this.normalizeComponentForPrefab(component))
+                .filter((component): component is any => component !== null)
+            : [];
+
+        if (componentsToProcess.length > 0) {
+            console.log(`处理节点 ${node._name} 的 ${componentsToProcess.length} 个组件`);
+
+            const componentRecords = componentsToProcess.map((component) => {
                 const componentIndex = context.currentId++;
-                componentIndices.push(componentIndex);
                 node._components.push({ "__id__": componentIndex });
-                
-                // 记录组件UUID到索引的映射
-                const componentUuid = component.uuid || (component.value && component.value.uuid);
+
+                const componentUuid = this.extractComponentUuid(component);
                 if (componentUuid) {
                     context.componentUuidToIndex.set(componentUuid, componentIndex);
                     console.log(`记录组件UUID映射: ${componentUuid} -> ${componentIndex}`);
                 }
-                
-                // 创建组件对象，传入context以处理引用
+
+                return { component, componentIndex };
+            });
+
+            for (const { component, componentIndex } of componentRecords) {
                 const componentObj = this.createComponentObject(component, nodeIndex, context);
                 prefabData[componentIndex] = componentObj;
-                
-                // 为组件创建 CompPrefabInfo
+
                 const compPrefabInfoIndex = context.currentId++;
                 prefabData[compPrefabInfoIndex] = {
                     "__type__": "cc.CompPrefabInfo",
                     "fileId": this.generateFileId()
                 };
-                
-                // 如果组件对象有 __prefab 属性，设置引用
+
                 if (componentObj && typeof componentObj === 'object') {
                     componentObj.__prefab = { "__id__": compPrefabInfoIndex };
                 }
             }
-            
-            console.log(`✅ 节点 ${node._name} 添加了 ${componentIndices.length} 个组件`);
+
+            console.log(`✅ 节点 ${node._name} 添加了 ${componentRecords.length} 个组件`);
         }
 
 
@@ -2330,6 +2402,142 @@ export class PrefabTools implements ToolExecutor {
         return result;
     }
 
+    private unwrapValue<T = any>(prop: any): T | undefined {
+        if (prop?.value !== undefined) {
+            return prop.value as T;
+        }
+        if (prop !== undefined) {
+            return prop as T;
+        }
+        return undefined;
+    }
+
+    private getNodeProperty(nodeData: any, key: string): any {
+        const candidates = [
+            nodeData?.[key],
+            nodeData?.value?.[key]
+        ];
+
+        for (const candidate of candidates) {
+            const value = this.unwrapValue(candidate);
+            if (value !== undefined && value !== null) {
+                return value;
+            }
+        }
+
+        return undefined;
+    }
+
+    private getNormalizedNodeState(nodeData: any, nodeName?: string): {
+        position: { x: number; y: number; z: number };
+        rotation: { x: number; y: number; z: number; w: number };
+        scale: { x: number; y: number; z: number };
+        active: boolean;
+        name: string;
+        layer: number;
+    } {
+        const position = this.getNodeProperty(nodeData, 'position') ?? { x: 0, y: 0, z: 0 };
+        const rotation = this.getNodeProperty(nodeData, 'rotation') ?? { x: 0, y: 0, z: 0, w: 1 };
+        const scale = this.getNodeProperty(nodeData, 'scale') ?? { x: 1, y: 1, z: 1 };
+        const active = this.getNodeProperty(nodeData, 'active') ?? true;
+        const name = nodeName ?? this.getNodeProperty(nodeData, 'name') ?? 'Node';
+        const layer = this.getNodeProperty(nodeData, 'layer') ?? 1073741824;
+        const toNumber = (value: any, fallback: number): number => {
+            const num = Number(value);
+            return Number.isFinite(num) ? num : fallback;
+        };
+
+        return {
+            position: {
+                x: toNumber(position.x, 0),
+                y: toNumber(position.y, 0),
+                z: toNumber(position.z, 0)
+            },
+            rotation: {
+                x: toNumber(rotation.x, 0),
+                y: toNumber(rotation.y, 0),
+                z: toNumber(rotation.z, 0),
+                w: rotation.w !== undefined ? toNumber(rotation.w, 1) : 1
+            },
+            scale: {
+                x: toNumber(scale.x, 1),
+                y: toNumber(scale.y, 1),
+                z: toNumber(scale.z, 1)
+            },
+            active: Boolean(active),
+            name: String(name),
+            layer: toNumber(layer, 1073741824)
+        };
+    }
+
+    private extractRawComponentsFromNode(nodeData: any): any[] {
+        const componentSources = [
+            nodeData?.__comps__,
+            nodeData?.components,
+            nodeData?.value?.__comps__,
+            nodeData?.value?.components
+        ];
+
+        for (const source of componentSources) {
+            if (Array.isArray(source)) {
+                return source.filter((comp: any) => comp && (comp.__type__ || comp.type));
+            }
+        }
+
+        return [];
+    }
+
+    private extractComponentUuid(componentData: any): string | null {
+        const candidates = [
+            componentData?.uuid?.value,
+            componentData?.uuid,
+            componentData?.value?.uuid?.value,
+            componentData?.value?.uuid
+        ];
+
+        for (const candidate of candidates) {
+            if (typeof candidate === 'string' && candidate.length > 0) {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private normalizeComponentForPrefab(componentData: any): any | null {
+        const properties = (componentData?.properties && typeof componentData.properties === 'object')
+            ? componentData.properties
+            : ((componentData?.value && typeof componentData.value === 'object') ? componentData.value : {});
+        const rawType = componentData?.type || componentData?.__type__ || 'cc.Component';
+        if (typeof rawType === 'string' && rawType.startsWith('cc.')) {
+            return {
+                ...componentData,
+                properties,
+                enabled: this.unwrapValue<boolean>(componentData.enabled) ?? true,
+                __prefabType__: rawType
+            };
+        }
+
+        const scriptAssetUuid =
+            properties?.__scriptAsset?.value?.uuid ??
+            properties?.__scriptAsset?.uuid ??
+            componentData?.properties?.__scriptAsset?.value?.uuid ??
+            componentData?.__scriptAsset?.value?.uuid ??
+            componentData?.__scriptAsset?.uuid;
+
+        if (typeof scriptAssetUuid === 'string' && scriptAssetUuid.length > 0) {
+            return {
+                ...componentData,
+                properties,
+                enabled: this.unwrapValue<boolean>(componentData.enabled) ?? true,
+                __prefabType__: this.uuidToCompressedId(scriptAssetUuid)
+            };
+        }
+
+        console.warn(`跳过脚本组件 ${rawType}，无法解析 __scriptAsset UUID`);
+        return null;
+    }
+
     /**
      * 创建组件对象
      */
@@ -2337,8 +2545,8 @@ export class PrefabTools implements ToolExecutor {
         nodeUuidToIndex?: Map<string, number>,
         componentUuidToIndex?: Map<string, number>
     }): any {
-        let componentType = componentData.type || componentData.__type__ || 'cc.Component';
-        const enabled = componentData.enabled !== undefined ? componentData.enabled : true;
+        const componentType = componentData.__prefabType__ || componentData.type || componentData.__type__ || 'cc.Component';
+        const enabled = this.unwrapValue<boolean>(componentData.enabled) ?? this.unwrapValue<boolean>(componentData._enabled) ?? true;
         
         // console.log(`创建组件对象 - 原始类型: ${componentType}`);
         // console.log('组件完整数据:', JSON.stringify(componentData, null, 2));
@@ -2363,8 +2571,8 @@ export class PrefabTools implements ToolExecutor {
         
         // 根据组件类型添加特定属性
         if (componentType === 'cc.UITransform') {
-            const contentSize = componentData.properties?.contentSize?.value || { width: 100, height: 100 };
-            const anchorPoint = componentData.properties?.anchorPoint?.value || { x: 0.5, y: 0.5 };
+            const contentSize = componentData.properties?.contentSize?.value ?? { width: 100, height: 100 };
+            const anchorPoint = componentData.properties?.anchorPoint?.value ?? { x: 0.5, y: 0.5 };
             
             component._contentSize = {
                 "__type__": "cc.Size",
@@ -2529,21 +2737,20 @@ export class PrefabTools implements ToolExecutor {
             };
         }
 
-        // 处理组件引用（包括具体的组件类型如cc.Label, cc.Button等）
+        // 处理组件引用（包括内置组件和自定义脚本组件）
+        if (value?.uuid && context?.componentUuidToIndex?.has(value.uuid)) {
+            console.log(`Component reference ${type} UUID ${value.uuid} found in prefab context, converting to __id__`);
+            return {
+                "__id__": context.componentUuidToIndex.get(value.uuid)
+            };
+        }
+
         if (value?.uuid && (type === 'cc.Component' || 
             type === 'cc.Label' || type === 'cc.Button' || type === 'cc.Sprite' || 
             type === 'cc.UITransform' || type === 'cc.RigidBody2D' || 
             type === 'cc.BoxCollider2D' || type === 'cc.Animation' || 
-            type === 'cc.AudioSource' || (type?.startsWith('cc.') && !type.includes('@')))) {
-            // 在预制体中，组件引用也需要转换为 __id__ 形式
-            if (context?.componentUuidToIndex && context.componentUuidToIndex.has(value.uuid)) {
-                // 内部引用：转换为__id__格式
-                console.log(`Component reference ${type} UUID ${value.uuid} found in prefab context, converting to __id__`);
-                return {
-                    "__id__": context.componentUuidToIndex.get(value.uuid)
-                };
-            }
-            // 外部引用：设置为null，因为外部组件不属于预制体结构
+            type === 'cc.AudioSource' || (type?.startsWith('cc.') && !type.includes('@')) ||
+            (typeof type === 'string' && !type.startsWith('cc.')) || !type)) {
             console.warn(`Component reference ${type} UUID ${value.uuid} not found in prefab context, setting to null (external reference)`);
             return null;
         }
@@ -2590,8 +2797,10 @@ export class PrefabTools implements ToolExecutor {
 
         // 处理数组类型
         if (Array.isArray(value)) {
+            const elementType = propData.elementTypeData?.type;
+
             // 节点数组
-            if (propData.elementTypeData?.type === 'cc.Node') {
+            if (elementType === 'cc.Node') {
                 return value.map(item => {
                     if (item?.uuid && context?.nodeUuidToIndex?.has(item.uuid)) {
                         return { "__id__": context.nodeUuidToIndex.get(item.uuid) };
@@ -2599,14 +2808,24 @@ export class PrefabTools implements ToolExecutor {
                     return null;
                 }).filter(item => item !== null);
             }
-            
+
+            // 组件数组（包括自定义脚本组件）
+            if (elementType && value.some(item => item?.uuid && context?.componentUuidToIndex?.has(item.uuid))) {
+                return value.map(item => {
+                    if (item?.uuid && context?.componentUuidToIndex?.has(item.uuid)) {
+                        return { "__id__": context.componentUuidToIndex.get(item.uuid) };
+                    }
+                    return null;
+                }).filter(item => item !== null);
+            }
+
             // 资源数组
-            if (propData.elementTypeData?.type && propData.elementTypeData.type.startsWith('cc.')) {
+            if (elementType && elementType.startsWith('cc.')) {
                 return value.map(item => {
                     if (item?.uuid) {
                         return {
                             "__uuid__": this.uuidToCompressedId(item.uuid),
-                            "__expectedType__": propData.elementTypeData.type
+                            "__expectedType__": elementType
                         };
                     }
                     return null;
@@ -2632,22 +2851,7 @@ export class PrefabTools implements ToolExecutor {
      * 创建符合引擎标准的节点对象
      */
     private createEngineStandardNode(nodeData: any, parentNodeIndex: number | null, nodeName?: string): any {
-        // 调试：打印原始节点数据（已注释）
-        // console.log('原始节点数据:', JSON.stringify(nodeData, null, 2));
-        
-        // 提取节点的基本属性
-        const getValue = (prop: any) => {
-            if (prop?.value !== undefined) return prop.value;
-            if (prop !== undefined) return prop;
-            return null;
-        };
-        
-        const position = getValue(nodeData.position) || getValue(nodeData.value?.position) || { x: 0, y: 0, z: 0 };
-        const rotation = getValue(nodeData.rotation) || getValue(nodeData.value?.rotation) || { x: 0, y: 0, z: 0, w: 1 };
-        const scale = getValue(nodeData.scale) || getValue(nodeData.value?.scale) || { x: 1, y: 1, z: 1 };
-        const active = getValue(nodeData.active) ?? getValue(nodeData.value?.active) ?? true;
-        const name = nodeName || getValue(nodeData.name) || getValue(nodeData.value?.name) || 'Node';
-        const layer = getValue(nodeData.layer) || getValue(nodeData.value?.layer) || 1073741824;
+        const { position, rotation, scale, active, name, layer } = this.getNormalizedNodeState(nodeData, nodeName);
 
         // 调试输出
         console.log(`创建节点: ${name}, parentNodeIndex: ${parentNodeIndex}`);
@@ -3002,24 +3206,11 @@ export class PrefabTools implements ToolExecutor {
 
     // 从节点数据中提取组件信息
     private extractComponentsFromNode(nodeData: any): any[] {
-        const components: any[] = [];
-        
-        // 从不同位置尝试获取组件数据
-        const componentSources = [
-            nodeData.__comps__,
-            nodeData.components,
-            nodeData.value?.__comps__,
-            nodeData.value?.components
-        ];
-        
-        for (const source of componentSources) {
-            if (Array.isArray(source)) {
-                components.push(...source.filter(comp => comp && (comp.__type__ || comp.type)));
-                break; // 找到有效的组件数组就退出
-            }
+        if (!Array.isArray(nodeData?.components)) {
+            return [];
         }
-        
-        return components;
+
+        return nodeData.components.filter((comp: any) => comp && (comp.__type__ || comp.type));
     }
     
     // 创建标准的组件对象
