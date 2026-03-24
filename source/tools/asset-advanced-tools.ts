@@ -66,8 +66,8 @@ export class AssetAdvancedTools implements ToolExecutor {
                     properties: {
                         action: {
                             type: 'string',
-                            enum: ['dependencies', 'manifest'],
-                            description: 'Analysis type: "dependencies" = trace which assets this asset depends on (requires url parameter) | "manifest" = generate complete asset inventory report for folder (optional folder parameter, outputs JSON/CSV/XML format)'
+                            enum: ['dependencies', 'users', 'manifest'],
+                            description: 'Analysis type: "dependencies" = trace which assets this asset depends on (requires url parameter) | "users" = find which assets or scripts directly reference/use this asset (requires urlOrUUID parameter, reverse of dependencies) | "manifest" = generate complete asset inventory report for folder (optional folder parameter, outputs JSON/CSV/XML format)'
                         },
                         // Common parameters
                         folder: {
@@ -75,15 +75,16 @@ export class AssetAdvancedTools implements ToolExecutor {
                             description: 'Target folder path to analyze (both actions). Default: "db://assets" analyzes entire project. Examples: "db://assets/scenes" for scenes only, "db://assets/textures" for textures only.',
                             default: 'db://assets'
                         },
-                        // For dependencies action
-                        url: {
+                        // For dependencies / users action
+                        urlOrUUID: {
                             type: 'string',
-                            description: 'Asset URL to analyze dependencies for (REQUIRED for dependencies action). Must be valid Cocos asset URL like "db://assets/scenes/Game.scene" or "db://assets/prefabs/Player.prefab". Get URL from asset_query tool first.'
+                            description: 'Asset URL or UUID (REQUIRED for dependencies/users action). Can be a Cocos asset URL like "db://assets/textures/player.png" or a UUID like "1e6bb546-ec05-4cc4-bb24-68c6cd3ad5a6".'
                         },
-                        deep: {
-                            type: 'boolean',
-                            description: 'Include indirect dependencies (dependencies action only). true = show all nested dependencies recursively, false = show only direct dependencies. Recommended: true for complete analysis.',
-                            default: true
+                        assetType: {
+                            type: 'string',
+                            enum: ['asset', 'script', 'all'],
+                            description: 'Query asset type filter (dependencies/users action): "asset" = only asset references (default), "script" = only script references, "all" = both assets and scripts.',
+                            default: 'asset'
                         },
                         // For unused action
                         includeSubfolders: {
@@ -308,7 +309,9 @@ export class AssetAdvancedTools implements ToolExecutor {
             // case 'validate_refs': // COMMENTED OUT - Requires complex project analysis
             //     return await this.validateAssetReferences(args.folder);
             case 'dependencies':
-                return await this.getAssetDependencies(args.url, args.deep);
+                return await this.getAssetDependencies(args.urlOrUUID || args.url, args.assetType);
+            case 'users':
+                return await this.getAssetUsers(args.urlOrUUID, args.assetType);
             // case 'unused': // COMMENTED OUT - Requires complex project analysis
             //     return await this.getUnusedAssets(args.folder, args.includeSubfolders);
             case 'manifest':
@@ -546,15 +549,23 @@ export class AssetAdvancedTools implements ToolExecutor {
     }
     */
 
-    private async getAssetDependencies(url: string, deep: boolean = true): Promise<ToolResponse> {
+    /**
+     * 查询一个资源依赖的资源或脚本 uuid 数组（正向依赖查询）
+     * @param urlOrUUID 资源的 url 地址或者 uuid
+     * @param type 查询的资源类型，默认 asset，可选值：asset, script, all
+     */
+    private async getAssetDependencies(urlOrUUID: string, type: string = 'asset'): Promise<ToolResponse> {
         try {
-            const dependencies = await (Editor.Message.request as any)('asset-db', 'query-asset-dependencies', url, deep);
+            if (!urlOrUUID) {
+                return { success: false, error: 'url or urlOrUUID parameter is required for dependencies action' };
+            }
+            const dependencies = await (Editor.Message.request as any)('asset-db', 'query-asset-dependencies', urlOrUUID, type);
             return {
                 success: true,
                 message: `✅ Asset dependencies retrieved`,
                 data: {
-                    url,
-                    deep,
+                    urlOrUUID,
+                    type,
                     dependencies,
                     count: Array.isArray(dependencies) ? dependencies.length : 0
                 }
@@ -563,6 +574,35 @@ export class AssetAdvancedTools implements ToolExecutor {
             return {
                 success: false,
                 error: `Failed to get asset dependencies: ${(error as Error).message}`
+            };
+        }
+    }
+
+    /**
+     * 查询一个资源被哪些资源或脚本直接使用到（反向依赖查询）
+     * @param urlOrUUID 资源的 url 地址或者 uuid
+     * @param type 查询的资源类型，默认 asset，可选值：asset, script, all
+     */
+    private async getAssetUsers(urlOrUUID: string, type: string = 'asset'): Promise<ToolResponse> {
+        try {
+            if (!urlOrUUID) {
+                return { success: false, error: 'urlOrUUID parameter is required for users action' };
+            }
+            const users = await (Editor.Message.request as any)('asset-db', 'query-asset-users', urlOrUUID, type);
+            return {
+                success: true,
+                message: `✅ Asset users retrieved`,
+                data: {
+                    urlOrUUID,
+                    type,
+                    users,
+                    count: Array.isArray(users) ? users.length : 0
+                }
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: `Failed to get asset users: ${(error as Error).message}`
             };
         }
     }
