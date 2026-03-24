@@ -60,14 +60,14 @@ export class AssetAdvancedTools implements ToolExecutor {
             },
             {
                 name: 'asset_analyze',
-                description: 'ASSET ANALYSIS: Get dependencies or export manifests. Use this to understand asset relationships and generate project reports. WORKFLOW: Use dependencies to trace asset usage, use manifest to export inventory. LIMITATIONS: Reference validation and unused asset detection are disabled due to API constraints.',
+                description: 'ASSET ANALYSIS: Analyze asset relationships (dependencies/users) or export manifests. WORKFLOW: Use "dependencies" to find what an asset depends on, "users" to find what references an asset (reverse lookup), "manifest" to export inventory. RETURNS: dependencies/users actions return { urlOrUUID, type, dependencies/users: Array<{ uuid, path, name, type }>, count }. Each item contains resolved asset info (path like "db://assets/...", name like "MyPrefab.prefab", type like "cc.Prefab"/"cc.TypeScript"). LIMITATIONS: Reference validation and unused asset detection are disabled due to API constraints.',
                 inputSchema: {
                     type: 'object',
                     properties: {
                         action: {
                             type: 'string',
                             enum: ['dependencies', 'users', 'manifest'],
-                            description: 'Analysis type: "dependencies" = trace which assets this asset depends on (requires url parameter) | "users" = find which assets or scripts directly reference/use this asset (requires urlOrUUID parameter, reverse of dependencies) | "manifest" = generate complete asset inventory report for folder (optional folder parameter, outputs JSON/CSV/XML format)'
+                            description: 'Analysis type: "dependencies" = find all assets/scripts this asset depends on (forward lookup, requires urlOrUUID). Returns Array<{ uuid, path, name, type }>. | "users" = find all assets/scripts that directly reference this asset (reverse lookup, requires urlOrUUID). Returns Array<{ uuid, path, name, type }>. | "manifest" = generate complete asset inventory report for a folder (optional folder parameter, outputs JSON/CSV/XML format).'
                         },
                         // Common parameters
                         folder: {
@@ -83,7 +83,7 @@ export class AssetAdvancedTools implements ToolExecutor {
                         assetType: {
                             type: 'string',
                             enum: ['asset', 'script', 'all'],
-                            description: 'Query asset type filter (dependencies/users action): "asset" = only asset references (default), "script" = only script references, "all" = both assets and scripts.',
+                            description: 'Query asset type filter (dependencies/users action): "asset" = only non-script asset references (default), "script" = only script (.ts) references, "all" = both assets and scripts. Affects which types appear in the returned array.',
                             default: 'asset'
                         },
                         // For unused action
@@ -550,7 +550,29 @@ export class AssetAdvancedTools implements ToolExecutor {
     */
 
     /**
-     * 查询一个资源依赖的资源或脚本 uuid 数组（正向依赖查询）
+     * 批量将 uuid 数组解析为包含 path/name/type 的详细信息
+     * 解析失败的 uuid 仍保留原始值，不会丢失
+     */
+    private async resolveUUIDs(uuids: string[]): Promise<Array<{ uuid: string; path?: string; name?: string; type?: string }>> {
+        if (!Array.isArray(uuids) || uuids.length === 0) return [];
+        const results = await Promise.all(
+            uuids.map(async (uuid) => {
+                try {
+                    const info = await (Editor.Message.request as any)('asset-db', 'query-asset-info', uuid);
+                    if (info) {
+                        return { uuid, path: info.url || info.path, name: info.name, type: info.type };
+                    }
+                    return { uuid };
+                } catch {
+                    return { uuid };
+                }
+            })
+        );
+        return results;
+    }
+
+    /**
+     * 查询一个资源依赖的资源或脚本（正向依赖查询）
      * @param urlOrUUID 资源的 url 地址或者 uuid
      * @param type 查询的资源类型，默认 asset，可选值：asset, script, all
      */
@@ -559,7 +581,8 @@ export class AssetAdvancedTools implements ToolExecutor {
             if (!urlOrUUID) {
                 return { success: false, error: 'url or urlOrUUID parameter is required for dependencies action' };
             }
-            const dependencies = await (Editor.Message.request as any)('asset-db', 'query-asset-dependencies', urlOrUUID, type);
+            const rawUUIDs: string[] = await (Editor.Message.request as any)('asset-db', 'query-asset-dependencies', urlOrUUID, type);
+            const dependencies = await this.resolveUUIDs(rawUUIDs);
             return {
                 success: true,
                 message: `✅ Asset dependencies retrieved`,
@@ -567,7 +590,7 @@ export class AssetAdvancedTools implements ToolExecutor {
                     urlOrUUID,
                     type,
                     dependencies,
-                    count: Array.isArray(dependencies) ? dependencies.length : 0
+                    count: dependencies.length
                 }
             };
         } catch (error) {
@@ -588,7 +611,8 @@ export class AssetAdvancedTools implements ToolExecutor {
             if (!urlOrUUID) {
                 return { success: false, error: 'urlOrUUID parameter is required for users action' };
             }
-            const users = await (Editor.Message.request as any)('asset-db', 'query-asset-users', urlOrUUID, type);
+            const rawUUIDs: string[] = await (Editor.Message.request as any)('asset-db', 'query-asset-users', urlOrUUID, type);
+            const users = await this.resolveUUIDs(rawUUIDs);
             return {
                 success: true,
                 message: `✅ Asset users retrieved`,
@@ -596,7 +620,7 @@ export class AssetAdvancedTools implements ToolExecutor {
                     urlOrUUID,
                     type,
                     users,
-                    count: Array.isArray(users) ? users.length : 0
+                    count: users.length
                 }
             };
         } catch (error) {
