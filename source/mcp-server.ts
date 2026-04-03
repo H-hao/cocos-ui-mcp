@@ -127,6 +127,20 @@ export class MCPServer {
             }
         }
         
+        // 确保管理类工具始终注册（不受白名单过滤影响）
+        const alwaysInclude = new Set(['server_mcp_restart']);
+        for (const name of alwaysInclude) {
+            if (!this.toolsList.some(t => t.name === name)) {
+                const [cat, ...rest] = name.split('_');
+                const toolSet = this.tools[cat];
+                if (toolSet) {
+                    const def = toolSet.getTools().find((t: ToolDefinition) => t.name === rest.join('_'));
+                    if (def) {
+                        this.toolsList.push({ name, description: def.description, inputSchema: def.inputSchema });
+                    }
+                }
+            }
+        }
         console.log(`[MCPServer] Setup tools: ${this.toolsList.length} tools available`);
     }
 
@@ -198,11 +212,21 @@ export class MCPServer {
             } else if (pathname === '/health' && req.method === 'GET') {
                 res.writeHead(200);
                 res.end(JSON.stringify({ status: 'ok', tools: this.toolsList.length }));
-            } else if (pathname?.startsWith('/api/') && req.method === 'POST') {
-                await this.handleSimpleAPIRequest(req, res, pathname);
+            } else if (pathname === '/api/restart' && req.method === 'POST') {
+                // 先返回响应（重启会关闭当前 HTTP 服务器）
+                res.writeHead(200);
+                res.end(JSON.stringify({ success: true, message: 'Restart triggered' }));
+                // 异步触发主进程的热重启
+                setTimeout(() => {
+                    Editor.Message.request('ben-cocos-mcp', 'restart-server-from-dist').catch((err: any) => {
+                        console.error('[MCP] restart via API failed:', err);
+                    });
+                }, 100);
             } else if (pathname === '/api/tools' && req.method === 'GET') {
                 res.writeHead(200);
                 res.end(JSON.stringify({ tools: this.getSimplifiedToolsList() }));
+            } else if (pathname?.startsWith('/api/') && req.method === 'POST') {
+                await this.handleSimpleAPIRequest(req, res, pathname);
             } else {
                 res.writeHead(404);
                 res.end(JSON.stringify({ error: 'Not found' }));

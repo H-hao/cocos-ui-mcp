@@ -2088,7 +2088,9 @@ export class ComponentTools implements ToolExecutor {
                     return;
                 }
 
-                const buttonComponent = refreshedComponents.data.components.find((comp: any) => comp.type === 'cc.Button');
+                const buttonComponent = refreshedComponents.data.components.find((comp: any) =>
+                    comp.type === 'cc.Button' || comp.properties?.clickEvents != null
+                );
                 if (!buttonComponent) {
                     resolve({ success: false, error: 'Node does not have a Button component' });
                     return;
@@ -2225,18 +2227,24 @@ export class ComponentTools implements ToolExecutor {
                             return;
                         }
 
-                        const targetComponent = targetComponents.data.components.find((comp: any) => 
-                            comp.type === componentName || 
-                            (comp.properties && comp.properties._name && comp.properties._name.value === componentName)
-                        );
-                        
+                        const targetComponent = targetComponents.data.components.find((comp: any) => {
+                            if (comp.type === componentName) return true;
+                            if (comp.properties?._name?.value === componentName) return true;
+                            // 支持人类可读类名匹配（name 格式为 "NodeName<ClassName>"）
+                            const nameVal = comp.properties?.name?.value || '';
+                            if (nameVal.includes(`<${componentName}>`)) return true;
+                            return false;
+                        });
+
                         if (!targetComponent) {
-                            resolve({ 
-                                success: false, 
-                                error: `Component '${componentName}' not found on target node. Available components: ${targetComponents.data.components.map((c: any) => c.type).join(', ')}` 
+                            resolve({
+                                success: false,
+                                error: `Component '${componentName}' not found on target node. Available components: ${targetComponents.data.components.map((c: any) => c.type).join(', ')}`
                             });
                             return;
                         }
+                        // 如果用户传的是人类可读名，替换为实际 type（压缩 UUID），后续 _componentId 需要用它
+                        const resolvedComponentType = targetComponent.type;
                         
                         // 验证 handler 方法是否存在于目标组件中
                         if (handlerName) {
@@ -2314,7 +2322,7 @@ export class ComponentTools implements ToolExecutor {
                                 },
                                 _componentId: {
                                     name: "_componentId",
-                                    value: componentName,
+                                    value: resolvedComponentType || componentName,
                                     default: "",
                                     type: "String",
                                     readonly: false,
@@ -2453,8 +2461,10 @@ export class ComponentTools implements ToolExecutor {
 
                 // 使用Editor的set-property消息设置clickEvents
                 // 找到Button组件在组件数组中的索引位置
-                const buttonIndex = refreshedComponents.data.components.findIndex((comp: any) => comp.type === 'cc.Button');
-                
+                const buttonIndex = refreshedComponents.data.components.findIndex((comp: any) =>
+                    comp.type === 'cc.Button' || comp.properties?.clickEvents != null
+                );
+
                 if (buttonIndex === -1) {
                     resolve({ success: false, error: 'Button component index not found' });
                     return;
@@ -2488,10 +2498,12 @@ export class ComponentTools implements ToolExecutor {
                         return;
                     }
                     
-                    const verifyButton = verifyComponents.data.components.find((comp: any) => comp.type === 'cc.Button');
+                    const verifyButton = verifyComponents.data.components.find((comp: any) =>
+                        comp.type === 'cc.Button' || comp.properties?.clickEvents != null
+                    );
                     if (!verifyButton) {
-                        resolve({ 
-                            success: false, 
+                        resolve({
+                            success: false,
                             error: 'Failed to verify click event changes - Button component not found' 
                         });
                         return;

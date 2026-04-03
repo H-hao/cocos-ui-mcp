@@ -20,7 +20,18 @@ export class ServerTools implements ToolExecutor {
                 }
             },
 
-            // 2. Server Connectivity Testing - Network and connectivity
+            // 2. Server Restart - Hot reload from dist
+            {
+                name: 'mcp_restart',
+                description: 'SERVER RESTART: Hot-restart the MCP server from latest dist build. Reloads server code, recreates server instance, and reopens the editor panel. Use after rebuilding the MCP extension to apply code changes without manually restarting.',
+                inputSchema: {
+                    type: 'object',
+                    properties: {},
+                    required: []
+                }
+            },
+
+            // 3. Server Connectivity Testing - Network and connectivity
             {
                 name: 'server_connectivity',
                 description: 'SERVER CONNECTIVITY: Test and diagnose network connectivity for the Cocos Creator editor server. USAGE: "test_connectivity" to verify server accessibility with custom timeout, "get_network_interfaces" for detailed network adapter information. Critical for troubleshooting connection problems.',
@@ -52,6 +63,8 @@ export class ServerTools implements ToolExecutor {
                 return await this.handleServerInformation(args);
             case 'server_connectivity':
                 return await this.handleServerConnectivity(args);
+            case 'mcp_restart':
+                return await this.handleServerRestart();
             default:
                 // Legacy tool support for backward compatibility
                 return await this.handleLegacyTools(toolName, args);
@@ -253,6 +266,16 @@ export class ServerTools implements ToolExecutor {
             default:
                 return { success: false, error: `Unknown server information action: ${action}` };
         }
+    }
+
+    private async handleServerRestart(): Promise<ToolResponse> {
+        // 先返回结果，异步触发重启（重启会销毁当前服务器实例）
+        setTimeout(() => {
+            Editor.Message.request('ben-cocos-mcp', 'restart-server-from-dist').catch((err: any) => {
+                console.error('[ServerTools] restart failed:', err);
+            });
+        }, 200);
+        return { success: true, message: '✅ Server restart triggered. The server will reload from dist in ~200ms.' };
     }
 
     private async handleServerConnectivity(args: any): Promise<ToolResponse> {
