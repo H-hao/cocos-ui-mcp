@@ -173,6 +173,21 @@ function validateOperation(operation: any, index: number, errors: UIValidationEr
     if (operation.op === 'addNode' && !operation.parent) {
         errors.push(error('PARENT_REQUIRED', `${path}.parent`, 'addNode requires parent NodeRef.'));
     }
+    if (operation.op === 'addNode' && !operation.node) {
+        errors.push(error('NODE_REQUIRED', `${path}.node`, 'addNode requires node.'));
+    }
+    if (operation.op === 'addComponent' && !operation.component) {
+        errors.push(error('COMPONENT_REQUIRED', `${path}.component`, 'addComponent requires component.'));
+    }
+    if ((operation.op === 'removeComponent' || operation.op === 'setComponentProps') && !operation.componentType) {
+        errors.push(error('COMPONENT_TYPE_REQUIRED', `${path}.componentType`, `${operation.op} requires componentType.`));
+    }
+    if (operation.op === 'instantiatePrefab' && !operation.prefab) {
+        errors.push(error('PREFAB_REQUIRED', `${path}.prefab`, 'instantiatePrefab requires prefab asset reference.'));
+    }
+    if (operation.op === 'instantiatePrefab' && !operation.parent && !operation.target) {
+        errors.push(error('PARENT_REQUIRED', `${path}.parent`, 'instantiatePrefab requires parent or target NodeRef.'));
+    }
     if (['removeNode', 'moveNode', 'setNodeProps', 'addComponent', 'removeComponent', 'setComponentProps', 'setAssetRef', 'setEventBindings', 'setPrefabInstanceOverride'].includes(operation.op) && !operation.target) {
         errors.push(error('TARGET_NODE_REQUIRED', `${path}.target`, `${operation.op} requires target NodeRef.`));
     }

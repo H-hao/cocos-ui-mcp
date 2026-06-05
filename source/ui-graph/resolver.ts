@@ -1,12 +1,9 @@
 import { UIGraphAssetRef, UIGraphTarget, NodeRef, UIValidationError } from './types';
 import { normalizeComponentType } from './validator';
+import { componentShortName, isEditorAvailable, loadTarget, queryAssetInfo, readComponents, readNodeName, readNodeUuid, resolveNodeInTree } from './editor-adapter';
 
 function error(code: string, path: string, message: string, suggestion?: string): UIValidationError {
     return { code, path, message, suggestion };
-}
-
-function getEditor(): any {
-    return (globalThis as any).Editor;
 }
 
 export interface ResolvedAsset extends UIGraphAssetRef {
@@ -17,28 +14,29 @@ export interface ResolvedAsset extends UIGraphAssetRef {
 }
 
 export async function resolveAsset(asset: UIGraphAssetRef): Promise<ResolvedAsset> {
-    const editor = getEditor();
     const result: ResolvedAsset = { ...asset, exists: false, typeMatched: true, errors: [], warnings: [] };
+    if (!asset?.path && !asset?.uuid) {
+        result.errors.push(error('ASSET_REF_REQUIRED', '$.asset', 'AssetRef must include path or uuid.'));
+        return result;
+    }
+    if (!isEditorAvailable()) {
+        result.warnings.push({ code: 'EDITOR_API_UNAVAILABLE', path: '$.asset', message: 'Cocos Editor asset-db API is unavailable in this environment.' });
+        return result;
+    }
     try {
-        let info: any = null;
-        if (asset.path && editor?.Message?.request) {
-            info = await editor.Message.request('asset-db', 'query-asset-info', asset.path);
-        } else if (asset.uuid && editor?.Message?.request) {
-            info = await editor.Message.request('asset-db', 'query-asset-info', asset.uuid);
-        }
-        if (info) {
-            result.exists = true;
-            result.path = info.url || asset.path;
-            result.uuid = info.uuid || asset.uuid;
-            result.type = asset.type || info.type || info.importer;
-            if (asset.type && info.type && String(info.type).toLowerCase().indexOf(String(asset.type).toLowerCase()) === -1) {
-                result.typeMatched = false;
-                result.errors.push(error('ASSET_TYPE_MISMATCH', '$.asset', `Asset type does not match ${asset.type}.`));
-            }
-        } else if (!editor?.Message?.request) {
-            result.warnings.push({ code: 'EDITOR_API_UNAVAILABLE', path: '$.asset', message: 'Cocos Editor asset-db API is unavailable in this environment.' });
-        } else {
+        const info = await queryAssetInfo(asset);
+        if (!info) {
             result.errors.push(error('ASSET_NOT_FOUND', '$.asset', `Asset ${asset.path || asset.uuid} was not found.`, 'Use resolve_assets before writing.'));
+            return result;
+        }
+        result.exists = true;
+        result.path = info.url || info.path || asset.path;
+        result.uuid = info.uuid || asset.uuid;
+        const actualType = String(info.type || info.importer || '');
+        result.type = asset.type || actualType || result.type;
+        if (asset.type && actualType && !actualType.toLowerCase().includes(String(asset.type).toLowerCase())) {
+            result.typeMatched = false;
+            result.errors.push(error('ASSET_TYPE_MISMATCH', '$.asset.type', `Asset type ${actualType} does not match expected ${asset.type}.`));
         }
     } catch (e: any) {
         result.errors.push(error('ASSET_NOT_FOUND', '$.asset', e?.message || `Asset ${asset.path || asset.uuid} was not found.`));
@@ -51,29 +49,27 @@ export async function resolveAssets(assets: UIGraphAssetRef[]): Promise<Resolved
 }
 
 export async function resolveTarget(target: UIGraphTarget): Promise<any> {
-    return { ...target, resolved: Boolean(target?.path || target?.uuid || target?.current) };
+    const loaded = await loadTarget(target);
+    return { ...target, root: loaded.root, mode: loaded.mode, warnings: loaded.warnings, resolved: Boolean(loaded.root) };
 }
 
 export function resolveNodeRef(root: any, ref: NodeRef): any {
     if (!root) throw error('TARGET_NOT_LOADED', '$.target', 'Target root is not loaded.');
-    const matches: any[] = [];
-    const visit = (node: any, path: string) => {
-        const nodePath = node.path || path;
-        if (ref.uuid && node.uuid === ref.uuid) matches.push(node);
-        else if (ref.path && nodePath === ref.path) matches.push(node);
-        else if (ref.name && node.name === ref.name) matches.push(node);
-        (node.children || []).forEach((child: any) => visit(child, `${nodePath}/${child.name}`));
-    };
-    visit(root, root.name || 'Root');
-    if (matches.length === 0) throw error('NODE_NOT_FOUND', '$.target', `Node ${ref.uuid || ref.path || ref.name} was not found.`);
-    if (!ref.uuid && matches.length > 1) throw error('AMBIGUOUS_NODE_NAME', '$.target', `Node ref ${ref.path || ref.name} matched multiple nodes.`, 'Use uuid or a full path from inspect/export.');
-    return matches[0];
+    try {
+        const node = resolveNodeInTree(root, ref);
+        if (!node) throw error('NODE_NOT_FOUND', '$.target', `Node ${ref.uuid || ref.path || ref.name} was not found.`);
+        return { ...node, uuid: readNodeUuid(node), name: readNodeName(node) };
+    } catch (e: any) {
+        if (e?.code === 'AMBIGUOUS_NODE_NAME') throw error('AMBIGUOUS_NODE_NAME', '$.target', e.message, 'Use uuid or a full path from inspect/export.');
+        throw e;
+    }
 }
 
 export function resolveComponent(node: any, componentType: string): any {
     const normalized = normalizeComponentType(componentType);
-    const component = (node?.components || []).find((item: any) => normalizeComponentType(item.type) === normalized);
-    if (!component) throw error('COMPONENT_NOT_FOUND', '$.componentType', `Component ${normalized} was not found on node ${node?.name || ''}.`);
+    const components = readComponents(node);
+    const component = components.find((item) => item.type === normalized || componentShortName(item.rawType) === normalized);
+    if (!component) throw error('COMPONENT_NOT_FOUND', '$.componentType', `Component ${normalized} was not found on node ${readNodeName(node)}.`);
     return component;
 }
 

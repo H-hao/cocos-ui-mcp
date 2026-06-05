@@ -38,17 +38,123 @@ export const FORBIDDEN_TOP_LEVEL_FIELDS = ['dryRun', 'diff', 'confirmWrite', 'ba
 export const NODE_REF_FIELDS = ['uuid', 'path', 'name'];
 export const ASSET_TYPES = ['SpriteFrame', 'Prefab', 'Material', 'Script'];
 
+const vector3Schema = {
+    type: 'object',
+    additionalProperties: false,
+    properties: { x: { type: 'number' }, y: { type: 'number' }, z: { type: 'number' } }
+};
+
+const sizeSchema = {
+    type: 'object',
+    additionalProperties: false,
+    properties: { width: { type: 'number' }, height: { type: 'number' } }
+};
+
+const nodeRefSchema = {
+    type: 'object',
+    additionalProperties: false,
+    anyOf: [{ required: ['uuid'] }, { required: ['path'] }, { required: ['name'] }],
+    properties: { uuid: { type: 'string' }, path: { type: 'string' }, name: { type: 'string' } }
+};
+
+const targetSchema = {
+    type: 'object',
+    additionalProperties: false,
+    required: ['type'],
+    properties: {
+        type: { type: 'string', enum: ['prefab', 'scene', 'node'] },
+        path: { type: 'string' },
+        uuid: { type: 'string' },
+        current: { type: 'boolean' }
+    }
+};
+
+const assetRefSchema = {
+    type: 'object',
+    additionalProperties: false,
+    anyOf: [{ required: ['path'] }, { required: ['uuid'] }],
+    properties: { path: { type: 'string' }, uuid: { type: 'string' }, type: { type: 'string', enum: ASSET_TYPES } }
+};
+
+const componentSchema = {
+    type: 'object',
+    additionalProperties: false,
+    required: ['type'],
+    properties: {
+        type: { type: 'string' },
+        enabled: { type: 'boolean' },
+        props: { type: 'object', additionalProperties: true }
+    }
+};
+
+const dynamicContentSchema = {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+        containerRole: { type: 'string' },
+        dataSource: { type: 'string' },
+        itemPrefab: assetRefSchema,
+        bindingScript: assetRefSchema,
+        editorPreview: true
+    }
+};
+
+const nodeSchema: any = {
+    type: 'object',
+    additionalProperties: false,
+    required: ['name'],
+    properties: {
+        name: { type: 'string' },
+        uuid: { type: 'string' },
+        path: { type: 'string' },
+        active: { type: 'boolean' },
+        factory: { type: 'string', enum: SUPPORTED_FACTORIES },
+        position: vector3Schema,
+        scale: vector3Schema,
+        rotation: vector3Schema,
+        size: sizeSchema,
+        components: { type: 'array', items: componentSchema },
+        children: { type: 'array', items: {} },
+        prefab: assetRefSchema,
+        prefabOverrides: { type: 'array', items: { type: 'object' } },
+        dynamicContent: dynamicContentSchema
+    }
+};
+nodeSchema.properties.children.items = nodeSchema;
+
+const operationSchema = {
+    type: 'object',
+    additionalProperties: false,
+    required: ['op'],
+    properties: {
+        op: { type: 'string', enum: SUPPORTED_OPERATIONS },
+        parent: nodeRefSchema,
+        target: nodeRefSchema,
+        newParent: nodeRefSchema,
+        node: nodeSchema,
+        component: componentSchema,
+        componentType: { type: 'string' },
+        props: { type: 'object', additionalProperties: true },
+        asset: assetRefSchema,
+        prefab: assetRefSchema,
+        scene: targetSchema,
+        ifMissing: { type: 'string', enum: ['error', 'ignore'] },
+        required: { type: 'boolean' },
+        eventBindings: { type: 'array', items: { type: 'object' } },
+        overrides: { type: 'object', additionalProperties: true }
+    }
+};
+
 export const uiGraphSchema = {
     type: 'object',
     additionalProperties: false,
     required: ['schemaVersion', 'target', 'root'],
     properties: {
         schemaVersion: { const: UI_GRAPH_SCHEMA_VERSION },
-        target: { $ref: '#/$defs/target' },
-        metadata: { type: 'object' },
-        root: { $ref: '#/$defs/node' }
-    },
-    $defs: {}
+        target: targetSchema,
+        metadata: { type: 'object', additionalProperties: true },
+        root: nodeSchema
+    }
 };
 
 export const uiPatchSchema = {
@@ -57,11 +163,10 @@ export const uiPatchSchema = {
     required: ['schemaVersion', 'target', 'operations'],
     properties: {
         schemaVersion: { const: UI_PATCH_SCHEMA_VERSION },
-        target: { $ref: '#/$defs/target' },
-        metadata: { type: 'object' },
-        operations: { type: 'array', items: { type: 'object' } }
-    },
-    $defs: {}
+        target: targetSchema,
+        metadata: { type: 'object', additionalProperties: true },
+        operations: { type: 'array', items: operationSchema }
+    }
 };
 
 export const uiGraphToolInputSchemas = {

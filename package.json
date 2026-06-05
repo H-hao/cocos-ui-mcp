@@ -12,7 +12,8 @@
         "build": "npm-run-all build:panel build:ts",
         "watch:panel": "vite build --config vite.panel.config.ts --watch",
         "watch:ts": "tsc -w",
-        "watch": "npm-run-all --parallel watch:panel watch:ts"
+        "watch": "npm-run-all --parallel watch:panel watch:ts",
+        "test:ui-graph": "npm run build:ts && node dist/test/ui-graph-test-runner.js"
     },
     "description": "i18n:ben-cocos-mcp.description",
     "main": "./dist/main.js",

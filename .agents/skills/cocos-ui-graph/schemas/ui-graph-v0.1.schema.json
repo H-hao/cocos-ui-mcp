@@ -6,8 +6,83 @@
   "required": ["schemaVersion", "target", "root"],
   "properties": {
     "schemaVersion": { "const": "ui-graph/v0.1" },
-    "target": { "type": "object" },
-    "metadata": { "type": "object" },
-    "root": { "type": "object" }
+    "target": { "$ref": "#/$defs/target" },
+    "metadata": { "type": "object", "additionalProperties": true },
+    "root": { "$ref": "#/$defs/node" }
+  },
+  "$defs": {
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "type": "string", "enum": ["prefab", "scene", "node"] },
+        "path": { "type": "string" },
+        "uuid": { "type": "string" },
+        "current": { "type": "boolean" }
+      }
+    },
+    "assetRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "anyOf": [{ "required": ["path"] }, { "required": ["uuid"] }],
+      "properties": {
+        "path": { "type": "string" },
+        "uuid": { "type": "string" },
+        "type": { "type": "string", "enum": ["SpriteFrame", "Prefab", "Material", "Script"] }
+      }
+    },
+    "vec3": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "x": { "type": "number" }, "y": { "type": "number" }, "z": { "type": "number" } }
+    },
+    "size": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "width": { "type": "number" }, "height": { "type": "number" } }
+    },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "type": "string" },
+        "enabled": { "type": "boolean" },
+        "props": { "type": "object", "additionalProperties": true }
+      }
+    },
+    "dynamicContent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "containerRole": { "type": "string" },
+        "dataSource": { "type": "string" },
+        "itemPrefab": { "$ref": "#/$defs/assetRef" },
+        "bindingScript": { "$ref": "#/$defs/assetRef" },
+        "editorPreview": true
+      }
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "uuid": { "type": "string" },
+        "path": { "type": "string" },
+        "active": { "type": "boolean" },
+        "factory": { "type": "string", "enum": ["Node", "Sprite", "Label", "Button", "Toggle", "Slider", "ScrollView", "PageView", "PageViewIndicator", "ProgressBar"] },
+        "position": { "$ref": "#/$defs/vec3" },
+        "scale": { "$ref": "#/$defs/vec3" },
+        "rotation": { "$ref": "#/$defs/vec3" },
+        "size": { "$ref": "#/$defs/size" },
+        "components": { "type": "array", "items": { "$ref": "#/$defs/component" } },
+        "children": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+        "prefab": { "$ref": "#/$defs/assetRef" },
+        "prefabOverrides": { "type": "array", "items": { "type": "object" } },
+        "dynamicContent": { "$ref": "#/$defs/dynamicContent" }
+      }
+    }
   }
 }
