@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Cocos UI Graph v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "target", "root"],
+  "properties": {
+    "schemaVersion": { "const": "ui-graph/v0.1" },
+    "target": { "type": "object" },
+    "metadata": { "type": "object" },
+    "root": { "type": "object" }
+  }
+}

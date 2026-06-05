@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Cocos UI Patch v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "target", "operations"],
+  "properties": {
+    "schemaVersion": { "const": "ui-patch/v0.1" },
+    "target": { "type": "object" },
+    "metadata": { "type": "object" },
+    "operations": { "type": "array", "items": { "type": "object" } }
+  }
+}

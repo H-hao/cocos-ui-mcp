@@ -13,6 +13,7 @@ function cloneTools(tools: ToolConfig[]): ToolConfig[] {
 }
 
 const CATEGORY_NAME_MAP: Record<string, string> = {
+    uiGraph: 'UI Graph 生产线',
     scene: '场景工具',
     node: '节点工具',
     component: '组件工具',

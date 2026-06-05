@@ -68,7 +68,7 @@ export class ToolManager {
                 const key = `${tool.category}:${tool.name}`;
                 return {
                     ...tool,
-                    enabled: enabledMap.has(key) ? Boolean(enabledMap.get(key)) : true,
+                    enabled: enabledMap.has(key) ? Boolean(enabledMap.get(key)) : tool.category === 'uiGraph',
                 };
             });
 
@@ -151,9 +151,11 @@ export class ToolManager {
             const { ReferenceImageTools } = require('./reference-image-tools');
             const { AssetAdvancedTools } = require('./asset-advanced-tools');
             const { ValidationTools } = require('./validation-tools');
+            const { UiGraphTools } = require('./ui-graph-tools');
 
             // 初始化工具实例
             const tools = {
+                uiGraph: new UiGraphTools(),
                 scene: new SceneTools(),
                 node: new NodeTools(),
                 component: new ComponentTools(),
@@ -178,7 +180,7 @@ export class ToolManager {
                     this.availableTools.push({
                         category: category,
                         name: tool.name,
-                        enabled: true, // 默认启用
+                        enabled: category === 'uiGraph', // 默认只启用 UI Graph 高层工具，legacy 可手动开启
                         description: tool.description
                     });
                 });
@@ -195,6 +197,16 @@ export class ToolManager {
     private initializeDefaultTools(): void {
         // 默认工具列表作为后备方案
         const toolCategories = [
+            { category: 'uiGraph', name: 'UI Graph 生产线', tools: [
+                { name: 'get_project_ui_context', description: '查询 UI Graph 项目上下文' },
+                { name: 'inspect_ui_graph', description: '查询 UI 层级摘要' },
+                { name: 'export_ui_graph', description: '导出 UI Graph' },
+                { name: 'validate_ui_graph', description: '校验 Graph/Patch' },
+                { name: 'generate_prefab_from_graph', description: '根据 Graph 生成 Prefab' },
+                { name: 'apply_ui_patch', description: '应用 UI Patch' },
+                { name: 'instantiate_prefab_to_scene', description: '实例化 Prefab 到 Scene' },
+                { name: 'resolve_assets', description: '解析 UI 资源引用' }
+            ]},
             { category: 'scene', name: '场景工具', tools: [
                 { name: 'getCurrentSceneInfo', description: '获取当前场景信息' },
                 { name: 'getSceneHierarchy', description: '获取场景层级结构' },
@@ -276,7 +288,7 @@ export class ToolManager {
                 this.availableTools.push({
                     category: category.category,
                     name: tool.name,
-                    enabled: true, // 默认启用
+                    enabled: category.category === 'uiGraph', // fallback 同样默认只启用 UI Graph
                     description: tool.description
                 });
             });

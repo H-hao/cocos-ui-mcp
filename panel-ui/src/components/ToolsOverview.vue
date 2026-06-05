@@ -22,7 +22,7 @@ defineEmits<{
             <div class="tools-overview-row">
                 <div class="tools-overview-title">
                     <h3 class="text-sm font-semibold">工具管理</h3>
-                    <p class="text-xs panel-subtle">按分类管理 MCP 工具启用状态</p>
+                    <p class="text-xs panel-subtle">默认启用 UI Graph 高层工具；legacy 细粒度工具保留为手动兜底。Schema: ui-graph/v0.1 / ui-patch/v0.1，Skill: cocos-ui-graph-skill/v0.1。</p>
                 </div>
                 <div class="tools-overview-actions">
                     <div class="tools-overview-group tools-overview-tags">
