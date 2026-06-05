@@ -807,3 +807,121 @@ Scene 能力首期主要用于将 Prefab 挂到指定 UI 层级。
 11. Report 可让 AI 根据错误修正 JSON。
 12. `npm run build` 通过。
 13. Cocos 编辑器内完成端到端自测。
+
+---
+
+## 5. 任务进度跟踪
+
+> 更新时间：2026-06-05。本文节记录当前仓库实现进度，用于区分“已落地代码骨架/脚本”“已通过自动化检查”和“仍需 Cocos 编辑器内真实闭环验证”的范围。
+
+### 5.1 当前总体状态
+
+当前最新实现已提交一版 UI Graph 生产线基础骨架，主要覆盖协议类型、轻量 schema、validator、MCP 工具注册、官方 Skill 初版、脚本生成器、面板工具分类提示和基础 smoke test。
+
+但该版本仍不能视为完整交付完成，原因是写入执行器、inspect/export、resolver 等能力目前更多是结构化骨架或降级实现，尚未在 Cocos Creator 编辑器内完成真实 Prefab/Scene 端到端闭环验证。
+
+当前状态应标记为：**阶段 1 基本完成，阶段 2/3 部分完成，阶段 4/5 未完成或待验证**。
+
+### 5.2 分阶段进度
+
+| 阶段 | 计划目标 | 当前状态 | 说明 |
+| --- | --- | --- | --- |
+| 第一阶段：协议闭环 | types/schema、validator、report、schemaHash、Skill 初版 | 部分完成 | 已新增 TypeScript 类型、协议常量、schemaHash、validator、report、Skill 初版和脚本；但 JSON Schema 仍偏轻量，尚未完整表达所有嵌套结构和组件属性 schema。 |
+| 第二阶段：只读闭环 | get_project_ui_context、resolve_assets、inspect_ui_graph、export_ui_graph | 部分完成 | 已注册工具并返回结构化结果；`get_project_ui_context` 已返回版本/hash/组件/operation 摘要；resolver/exporter 仍依赖编辑器 API 适配，当前缺少真实 Prefab/Scene 层级读取验证。 |
+| 第三阶段：写入闭环 | default-ui-factory、generate_prefab_from_graph、apply_ui_patch、instantiate_prefab_to_scene | 部分完成 | 已有执行器入口和二次 validate；default factory 有 fallback 结构；但真实 Cocos 节点/组件创建、Prefab 保存、Patch 操作和 Scene 实例化仍需对接并验证 Cocos Creator 3.8.x API。 |
+| 第四阶段：高级能力 | Prefab override、自定义脚本引用、dynamicContent、面板展示、Skill 脚本完善 | 少量完成 | dynamicContent validation warning、自定义脚本基础校验、面板分类提示和 Skill 脚本初版已存在；Prefab instance override 目前仅有 operation 骨架，尚未实现真实 override 写入。 |
+| 第五阶段：测试与验收 | 自动化测试、编辑器内手工测试、Skill 版本匹配测试、典型案例测试 | 部分完成 | 已新增 smoke test 并执行 TypeScript/panel/build 检查；尚未完成 Cocos 编辑器内端到端自测和典型 UI 生产案例验证。 |
+
+### 5.3 已完成事项
+
+1. 已新增 UI Graph/Patch/Report 相关 TypeScript 类型定义。
+2. 已新增 UI Graph/Patch 协议版本、Skill 版本、支持 factory、支持 operation、内置组件属性白名单和 schemaHash 机制。
+3. 已新增 validator，可拦截：
+   - 错误 `schemaVersion`；
+   - 未知顶层字段；
+   - 禁用字段 `dryRun`、`diff`、`confirmWrite`、`backup`、`rollback`、`id`；
+   - 非法 `NodeRef`；
+   - 未知 operation；
+   - 未知 factory；
+   - 未知内置组件属性；
+   - 部分不支持的自定义脚本数组属性。
+4. 已新增 UI Graph MCP 工具分类并注册以下高层工具：
+   - `uiGraph_get_project_ui_context`
+   - `uiGraph_inspect_ui_graph`
+   - `uiGraph_export_ui_graph`
+   - `uiGraph_validate_ui_graph`
+   - `uiGraph_generate_prefab_from_graph`
+   - `uiGraph_apply_ui_patch`
+   - `uiGraph_instantiate_prefab_to_scene`
+   - `uiGraph_resolve_assets`
+5. 已调整默认工具暴露策略：无显式启用配置时默认只暴露 UI Graph 高层工具；Tool Manager 新配置默认仅启用 `uiGraph` 分类，legacy 工具保留可手动启用。
+6. 已新增官方 Skill 初版，包含：
+   - `SKILL.md`
+   - Graph/Patch schema 文件
+   - add-label-node / create-label-prefab / instantiate-prefab 模板
+   - `make_patch.py`
+   - `make_graph.py`
+   - `validate_payload.py`
+   - `check_version.py`
+7. 已新增基础 smoke test 文件，覆盖 schema/version、validator、template 和 Skill version/hash 基础检查。
+8. 已执行并通过以下本地检查：
+   - `npm run build:ts`
+   - `npm run build:panel`
+   - `npm run build`
+   - Skill patch 生成与本地 payload 校验
+   - UI Graph smoke test runner
+   - Skill schemaHash 与 context schemaHash 对齐检查
+   - `git diff --check`
+
+### 5.4 未完成 / 待修正事项
+
+以下事项仍是完整交付的关键阻塞，后续实现不得仅停留在 report mock 或骨架逻辑：
+
+1. **完整 JSON Schema**
+   - 当前 schema 文件仍偏轻量；需要补齐 target、node、component、assetRef、dynamicContent、operation 等嵌套结构。
+   - 需要与 validator 使用同一份协议定义，避免 Skill schema 与插件 validator 漂移。
+
+2. **真实 Cocos Editor API 写入**
+   - `generate_prefab_from_graph` 需要通过 Cocos Creator 3.8.x 编辑器能力真实创建节点、添加组件、设置属性并保存 Prefab。
+   - `apply_ui_patch` 需要按 operation 顺序真实修改 Prefab/Scene，而不是只更新 report 计数。
+   - `instantiate_prefab_to_scene` 需要真实加载 Prefab 资源并挂载到指定 Scene 父节点。
+
+3. **真实 inspect/export**
+   - `inspect_ui_graph` 需要可靠读取 Prefab/Scene UI 层级、uuid、path、组件和 UITransform 信息。
+   - `export_ui_graph` 需要导出稀疏 Graph，并处理资源引用、unsupported/warnings 和 Scene UI 根节点过滤。
+
+4. **Resolver 完整化**
+   - 需要完成 target、node、component、asset、script reference 的真实解析。
+   - `name` 多匹配必须返回 `AMBIGUOUS_NODE_NAME`，并禁止静默选中。
+   - 资源类型校验需要覆盖 SpriteFrame、Prefab、Material、Script。
+
+5. **Prefab Instance Override**
+   - 需要实现实例根节点、实例内部子节点和子组件属性覆盖。
+   - 不得 unlink Prefab，不得修改源 Prefab，不支持新增/删除实例内部原有节点或组件。
+
+6. **自定义脚本组件写入**
+   - 需要真实挂载脚本组件并设置基础 JSON 属性、节点引用、组件引用和资源引用。
+   - 数组、自定义 class 和复杂 Cocos 类型继续保持首期不支持，并返回结构化错误。
+
+7. **面板展示完善**
+   - 当前面板仅更新分类名称和说明文字。
+   - 仍需展示当前 schemaVersion、schemaHash 和 Skill 版本匹配状态。
+
+8. **测试与验收**
+   - 需要将 smoke test 转为可由 npm script 或测试框架稳定执行的自动化测试。
+   - 需要在 Cocos Creator 编辑器内完成端到端手工自测：tools/list、context、Skill 生成、validate、generate prefab、apply patch、instantiate scene。
+   - 需要补充 Label 字号 55 的 Graph 生成、Patch 紧凑写法、Patch 步骤式写法三种验收案例。
+
+### 5.5 下一步执行建议
+
+后续开发应优先解决“真实 Cocos Editor API 闭环”，推荐顺序如下：
+
+1. 补齐并统一插件端 schema 与 Skill schema。
+2. 在 Cocos Creator 3.8.x 中验证可用的节点/组件/Prefab/Scene 编辑器 API。
+3. 先实现 Label 示例的真实闭环：
+   - Graph 生成 Label Prefab；
+   - Patch 给已有 Prefab 新增 Label 并设置 `fontSize = 55`；
+   - 将 Prefab 实例化到当前 Scene 的 Canvas/PageLayer。
+4. 完成 inspect/export 的真实层级读取，让修改流程严格满足“先查询，再修改”。
+5. 完成 resolver 与 asset type 校验。
+6. 最后补 Prefab override、自定义脚本引用、dynamicContent、面板版本匹配展示和端到端验收记录。
