@@ -150,6 +150,7 @@ onUnmounted(() => {
                         :disabled="disabledTools"
                         :is-saving="isSaving"
                         :is-saving-loading="isSavingLoading"
+                        :ui-graph-protocol="uiGraphProtocol"
                         @select-all="selectAllTools"
                         @deselect-all="deselectAllTools"
                         @save-changes="saveChanges"
@@ -159,6 +160,7 @@ onUnmounted(() => {
                             :sections="toolSections"
                             :is-saving="isSaving"
                             :is-saving-loading="isSavingLoading"
+                        :ui-graph-protocol="uiGraphProtocol"
                             @toggle-tool="({ category, name, enabled }) => updateSingleToolStatus(category, name, enabled)"
                             @toggle-category="({ category, enabled }) => toggleCategoryTools(category, enabled)"
                         />

@@ -23,10 +23,28 @@ export function runUiGraphValidatorSmokeTests() {
         id: 'forbidden',
         root: { name: 'LabelExample', factory: 'Node' }
     });
+    const scriptArrayProp = validateUiPatch({
+        schemaVersion: UI_PATCH_SCHEMA_VERSION,
+        target: { type: 'prefab', path: 'db://assets/ui/MainPanel.prefab' },
+        operations: [{ op: 'addComponent', target: { path: 'MainPanel' }, component: { type: 'script:InventoryPresenter', props: { items: [] } } }]
+    });
+    const prefabOverrideUnlink = validateUiPatch({
+        schemaVersion: UI_PATCH_SCHEMA_VERSION,
+        target: { type: 'scene', current: true },
+        operations: [{ op: 'setPrefabInstanceOverride', target: { path: 'Canvas/DialogInstance' }, overrides: { unlink: true, nodeProps: { active: true } } }]
+    });
+    const moveWithoutParent = validateUiPatch({
+        schemaVersion: UI_PATCH_SCHEMA_VERSION,
+        target: { type: 'scene', current: true },
+        operations: [{ op: 'moveNode', target: { path: 'Canvas/A' } }]
+    });
     return {
         validPatchPasses: validPatch.valid,
         unknownPropBlocked: invalidProp.errors.some((item) => item.code === 'UNKNOWN_COMPONENT_PROP'),
         unknownOperationBlocked: invalidOperation.errors.some((item) => item.code === 'UNKNOWN_PATCH_OPERATION'),
-        forbiddenFieldBlocked: invalidField.errors.some((item) => item.code === 'FORBIDDEN_FIELD' || item.code === 'UNKNOWN_FIELD')
+        forbiddenFieldBlocked: invalidField.errors.some((item) => item.code === 'FORBIDDEN_FIELD' || item.code === 'UNKNOWN_FIELD'),
+        scriptArrayPropBlocked: scriptArrayProp.errors.some((item) => item.code === 'UNSUPPORTED_SCRIPT_PROP_TYPE'),
+        prefabOverrideUnlinkBlocked: prefabOverrideUnlink.errors.some((item) => item.code === 'FORBIDDEN_PREFAB_OVERRIDE'),
+        moveRequiresParent: moveWithoutParent.errors.some((item) => item.code === 'NEW_PARENT_REQUIRED')
     };
 }

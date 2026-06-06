@@ -22,6 +22,7 @@ export function runUiGraphSmokeTestSuite() {
     assertTrue('add-label-node template valid', templates.addLabelNodeValid);
     assertTrue('create-label-prefab template valid', templates.createLabelPrefabValid);
     assertTrue('skill hash generated', skill.schemaHash.startsWith('sha256:'));
+    assertTrue('skill schema hash payload in sync', skill.skillSchemaPayloadInSync);
 
     return { validator, schema, templates, skill };
 }

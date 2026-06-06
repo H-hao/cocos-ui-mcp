@@ -1,4 +1,4 @@
-import { BUILTIN_COMPONENT_PROPS, COMPONENT_ALIASES, FORBIDDEN_TOP_LEVEL_FIELDS, NODE_REF_FIELDS, SUPPORTED_FACTORIES, SUPPORTED_OPERATIONS, UI_GRAPH_SCHEMA_VERSION, UI_PATCH_SCHEMA_VERSION } from './schema';
+import { ASSET_TYPES, BUILTIN_COMPONENT_PROPS, COMPONENT_ALIASES, FORBIDDEN_TOP_LEVEL_FIELDS, NODE_REF_FIELDS, SUPPORTED_FACTORIES, SUPPORTED_OPERATIONS, UI_GRAPH_SCHEMA_VERSION, UI_PATCH_SCHEMA_VERSION } from './schema';
 import { UIGraph, UIGraphComponent, UIGraphNode, UIPatch, UIPatchOperation, UIValidationError, UIValidationResult, UIValidationWarning } from './types';
 
 function isObject(value: any): value is Record<string, any> {
@@ -62,6 +62,21 @@ function validateTarget(target: any, path: string, errors: UIValidationError[]) 
     }
 }
 
+function validateAssetRef(asset: any, path: string, errors: UIValidationError[]) {
+    if (!isObject(asset)) {
+        errors.push(error('INVALID_ASSET_REF', path, 'AssetRef must be an object.'));
+        return;
+    }
+    const allowed = new Set(['path', 'uuid', 'type']);
+    checkUnknownKeys(asset, allowed, path, errors);
+    if (!asset.path && !asset.uuid) {
+        errors.push(error('ASSET_REF_REQUIRED', path, 'AssetRef must include path or uuid.'));
+    }
+    if (asset.type !== undefined && !ASSET_TYPES.includes(asset.type)) {
+        errors.push(error('UNKNOWN_ASSET_TYPE', `${path}.type`, `Asset type ${asset.type} is not supported.`, `Use one of: ${ASSET_TYPES.join(', ')}`));
+    }
+}
+
 function validateNodeRef(ref: any, path: string, errors: UIValidationError[]) {
     if (!isObject(ref)) {
         errors.push(error('INVALID_NODE_REF', path, 'NodeRef must be an object.'));
@@ -74,6 +89,28 @@ function validateNodeRef(ref: any, path: string, errors: UIValidationError[]) {
     }
 }
 
+function validateScriptPropValue(value: any, path: string, errors: UIValidationError[]) {
+    if (Array.isArray(value)) {
+        errors.push(error('UNSUPPORTED_SCRIPT_PROP_TYPE', path, 'Custom script array properties are not supported in v0.1.', 'Use scalar/object references only or extend the script schema.'));
+        return;
+    }
+    if (!isObject(value)) return;
+    const keys = Object.keys(value);
+    const isAssetRef = (value.path || value.uuid) && value.type;
+    const isWrappedRef = value.asset || value.node;
+    if (isAssetRef || isWrappedRef) {
+        if (value.asset !== undefined) validateAssetRef(value.asset, `${path}.asset`, errors);
+        if (value.node !== undefined) validateNodeRef(value.node, `${path}.node`, errors);
+        if (value.componentType !== undefined && typeof value.componentType !== 'string') errors.push(error('INVALID_COMPONENT_TYPE', `${path}.componentType`, 'componentType must be a string.'));
+        if (isAssetRef) validateAssetRef(value, path, errors);
+        return;
+    }
+    for (const [key, child] of Object.entries(value)) validateScriptPropValue(child, `${path}.${key}`, errors);
+    if (keys.some((key) => key.startsWith('__'))) {
+        errors.push(error('UNSUPPORTED_SCRIPT_PROP_TYPE', path, 'Custom script internal/private dump properties are not supported.', 'Use public Inspector properties only.'));
+    }
+}
+
 function validateProps(componentType: string, props: any, path: string, errors: UIValidationError[], warnings: UIValidationWarning[]) {
     if (props === undefined) return;
     if (!isObject(props)) {
@@ -83,9 +120,7 @@ function validateProps(componentType: string, props: any, path: string, errors: 
     const supported = BUILTIN_COMPONENT_PROPS[componentType];
     if (!supported) {
         for (const [key, value] of Object.entries(props)) {
-            if (Array.isArray(value)) {
-                errors.push(error('UNSUPPORTED_SCRIPT_PROP_TYPE', `${path}.${key}`, 'Custom script array properties are not supported in v0.1.', 'Use scalar/object references only or extend the script schema.'));
-            }
+            validateScriptPropValue(value, `${path}.${key}`, errors);
         }
         warnings.push(warning('SCRIPT_PROP_SCHEMA_UNKNOWN', path, `Custom script component "${componentType}" is accepted with basic JSON prop validation only.`));
         return;
@@ -187,6 +222,30 @@ function validateOperation(operation: any, index: number, errors: UIValidationEr
     }
     if (operation.op === 'instantiatePrefab' && !operation.parent && !operation.target) {
         errors.push(error('PARENT_REQUIRED', `${path}.parent`, 'instantiatePrefab requires parent or target NodeRef.'));
+    }
+    if (operation.op === 'moveNode' && !operation.newParent && !operation.parent) {
+        errors.push(error('NEW_PARENT_REQUIRED', `${path}.newParent`, 'moveNode requires newParent or parent NodeRef.'));
+    }
+    if (operation.op === 'setAssetRef') {
+        if (!operation.componentType) errors.push(error('COMPONENT_TYPE_REQUIRED', `${path}.componentType`, 'setAssetRef requires componentType.'));
+        if (!operation.props && !operation.asset) errors.push(error('ASSET_REF_REQUIRED', `${path}.asset`, 'setAssetRef requires props containing asset refs or an asset field.'));
+        if (operation.asset !== undefined) validateAssetRef(operation.asset, `${path}.asset`, errors);
+    }
+    if (operation.op === 'setEventBindings') {
+        if (!operation.componentType) errors.push(error('COMPONENT_TYPE_REQUIRED', `${path}.componentType`, 'setEventBindings requires componentType.'));
+        if (!operation.eventBindings && !operation.props) errors.push(error('EVENT_BINDINGS_REQUIRED', `${path}.eventBindings`, 'setEventBindings requires eventBindings or props.'));
+    }
+    if (operation.op === 'setPrefabInstanceOverride') {
+        const overrides = operation.overrides || {};
+        if (!operation.props && !operation.componentType && !overrides.props && !overrides.nodeProps && !overrides.componentProps) {
+            errors.push(error('OVERRIDES_REQUIRED', `${path}.overrides`, 'setPrefabInstanceOverride requires node or component props.'));
+        }
+        for (const forbidden of ['addNode', 'removeNode', 'addComponent', 'removeComponent', 'unlink', 'apply', 'revert']) {
+            if (overrides[forbidden] !== undefined) errors.push(error('FORBIDDEN_PREFAB_OVERRIDE', `${path}.overrides.${forbidden}`, 'Prefab instance override cannot add/remove/unlink/apply/revert in v0.1.', 'Only set existing instance node/component properties.'));
+        }
+        if (overrides.target !== undefined) validateNodeRef(overrides.target, `${path}.overrides.target`, errors);
+        if (overrides.node !== undefined) validateNodeRef(overrides.node, `${path}.overrides.node`, errors);
+        if (overrides.componentType !== undefined && typeof overrides.componentType !== 'string') errors.push(error('INVALID_COMPONENT_TYPE', `${path}.overrides.componentType`, 'componentType must be a string.'));
     }
     if (['removeNode', 'moveNode', 'setNodeProps', 'addComponent', 'removeComponent', 'setComponentProps', 'setAssetRef', 'setEventBindings', 'setPrefabInstanceOverride'].includes(operation.op) && !operation.target) {
         errors.push(error('TARGET_NODE_REQUIRED', `${path}.target`, `${operation.op} requires target NodeRef.`));

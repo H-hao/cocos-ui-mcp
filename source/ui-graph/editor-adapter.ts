@@ -139,6 +139,24 @@ export async function removeEditorNode(uuid: string): Promise<void> {
     catch { await editorRequest('scene', 'remove-node', uuid); }
 }
 
+export async function moveEditorNode(uuid: string, parentUuid: string): Promise<void> {
+    const attempts = [
+        () => editorRequest('scene', 'set-parent', { uuid, parent: parentUuid }),
+        () => editorRequest('scene', 'move-node', { uuid, parent: parentUuid }),
+        () => editorRequest('scene', 'set-property', { uuid, path: 'parent', dump: { value: parentUuid } }),
+    ];
+    let lastError: any;
+    for (const attempt of attempts) {
+        try {
+            await attempt();
+            return;
+        } catch (error) {
+            lastError = error;
+        }
+    }
+    throw lastError || new Error(`Failed to move node ${uuid} under parent ${parentUuid}`);
+}
+
 export async function addEditorComponent(nodeUuid: string, component: UIGraphComponent): Promise<void> {
     const componentType = toCocosComponentType(component.type);
     try {
@@ -221,7 +239,7 @@ export function resolveNodeInTree(root: any, ref: NodeRef): any | null {
         const name = readNodeName(node);
         const nodePath = node.path || path;
         if (ref.uuid && uuid === ref.uuid) matches.push({ ...node, path: nodePath });
-        else if (!ref.uuid && ref.path && nodePath === ref.path) matches.push({ ...node, path: nodePath });
+        else if (!ref.uuid && ref.path && (nodePath === ref.path || nodePath.endsWith(`/${ref.path}`))) matches.push({ ...node, path: nodePath });
         else if (!ref.uuid && !ref.path && ref.name && name === ref.name) matches.push({ ...node, path: nodePath });
     });
     if (matches.length === 0) return null;
@@ -254,8 +272,10 @@ export function visitTree(root: any, visitor: (node: any, path: string) => void,
 export function normalizeEditorValue(value: any): any {
     if (value && typeof value === 'object') {
         if ('asset' in value) return value.asset.uuid || value.asset.path;
+        if ('componentType' in value && 'node' in value) {
+            return { node: value.node.uuid || value.node.path || value.node.name, componentType: value.componentType };
+        }
         if ('node' in value) return value.node.uuid || value.node.path || value.node.name;
-        if ('componentType' in value && 'node' in value) return value.node.uuid || value.node.path || value.node.name;
         if ('path' in value && 'type' in value) return value.uuid || value.path;
     }
     return value;

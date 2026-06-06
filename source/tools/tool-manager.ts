@@ -2,6 +2,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { ToolConfig, ToolConfiguration, ToolManagerSettings, ToolDefinition } from '../types';
 import * as fs from 'fs';
 import * as path from 'path';
+import { getSchemaHash } from '../ui-graph/schema-hash';
+import { UI_GRAPH_PLUGIN_VERSION, UI_GRAPH_SCHEMA_VERSION, UI_GRAPH_SKILL_VERSION, UI_PATCH_SCHEMA_VERSION } from '../ui-graph/schema';
 
 export class ToolManager {
     private settings: ToolManagerSettings;
@@ -475,7 +477,15 @@ export class ToolManager {
             availableTools: currentConfig ? currentConfig.tools : this.getAvailableTools(),
             selectedConfigId: this.settings.currentConfigId,
             configurations: this.getConfigurations(),
-            maxConfigSlots: this.settings.maxConfigSlots
+            maxConfigSlots: this.settings.maxConfigSlots,
+            uiGraphProtocol: {
+                graphSchemaVersion: UI_GRAPH_SCHEMA_VERSION,
+                patchSchemaVersion: UI_PATCH_SCHEMA_VERSION,
+                schemaHash: getSchemaHash(),
+                supportedSkillVersion: UI_GRAPH_SKILL_VERSION,
+                pluginVersion: UI_GRAPH_PLUGIN_VERSION,
+                skillVersionMatched: true
+            }
         };
     }
 

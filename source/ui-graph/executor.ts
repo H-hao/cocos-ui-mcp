@@ -1,9 +1,9 @@
 import { createDefaultUINode } from './default-ui-factory';
 import { addError, addOperationResult, addUsedAsset, addWarning, createReport, summarize } from './report';
-import { resolveAsset } from './resolver';
+import { resolveAsset, resolveEditorProps, resolveNodeRef } from './resolver';
 import { UIGraph, UIGraphNode, UIPatch, UIPatchOperation, UIExecutionReport, UIGraphAssetRef, UIGraphComponent } from './types';
 import { validateUiGraph, validateUiPatch } from './validator';
-import { addEditorComponent, createEditorNode, createPrefabFromNode, instantiatePrefabAsset, isEditorAvailable, loadTarget, readNodeUuid, removeEditorComponent, removeEditorNode, resolveNodeUuid, saveCurrentSceneOrPrefab, setEditorComponentProps, setEditorNodeProps } from './editor-adapter';
+import { addEditorComponent, createEditorNode, createPrefabFromNode, instantiatePrefabAsset, isEditorAvailable, loadTarget, moveEditorNode, readNodeUuid, removeEditorComponent, removeEditorNode, resolveNodeUuid, saveCurrentSceneOrPrefab, setEditorComponentProps, setEditorNodeProps } from './editor-adapter';
 
 function validationErrorReport(target: any, errors: any[], warnings: any[] = []): UIExecutionReport {
     const report = createReport(target || {});
@@ -113,7 +113,7 @@ async function createGraphNodeRecursive(node: UIGraphNode, parentUuid: string | 
     }
     const uuid = await createEditorNode(node, parentUuid);
     report.summary.createdNodes += 1;
-    await setEditorNodeProps(uuid, nodeToProps(node));
+    await setEditorNodeProps(uuid, await resolveEditorProps({}, nodeToProps(node), `${path}.props`));
     for (const component of node.components || []) {
         await ensureComponentAndProps(uuid, component, report);
     }
@@ -133,7 +133,7 @@ async function ensureComponentAndProps(nodeUuid: string, component: UIGraphCompo
             resolved.errors.forEach((item) => addError(report, item));
         }
     }
-    await setEditorComponentProps(nodeUuid, component.type, component.props || {});
+    await setEditorComponentProps(nodeUuid, component.type, await resolveEditorProps({}, component.props || {}));
 }
 
 function nodeToProps(node: UIGraphNode): Record<string, any> {
@@ -182,7 +182,7 @@ async function executePatchOperation(operation: UIPatchOperation, index: number,
             }
             case 'setNodeProps': {
                 const uuid = await resolveNodeUuid(root, operation.target!);
-                await setEditorNodeProps(uuid, operation.props || {});
+                await setEditorNodeProps(uuid, await resolveEditorProps(root, operation.props || {}, `$.operations[${index}].props`));
                 report.summary.updatedProps += Object.keys(operation.props || {}).length;
                 return { index, op: operation.op, success: true, target: operation.target };
             }
@@ -199,23 +199,60 @@ async function executePatchOperation(operation: UIPatchOperation, index: number,
             }
             case 'setComponentProps': {
                 const uuid = await resolveNodeUuid(root, operation.target!);
-                await setEditorComponentProps(uuid, operation.componentType!, operation.props || {});
+                await setEditorComponentProps(uuid, operation.componentType!, await resolveEditorProps(root, operation.props || {}, `$.operations[${index}].props`));
                 report.summary.updatedProps += Object.keys(operation.props || {}).length;
                 return { index, op: operation.op, success: true, target: operation.target };
             }
             case 'instantiatePrefab': {
                 const parentUuid = await resolveNodeUuid(root, operation.parent || operation.target!);
-                const uuid = await instantiatePrefabAsset(operation.prefab!, parentUuid, operation.props || {});
+                const uuid = await instantiatePrefabAsset(operation.prefab!, parentUuid, await resolveEditorProps(root, operation.props || {}, `$.operations[${index}].props`));
                 report.summary.instantiatedPrefabs += 1;
                 return { index, op: operation.op, success: true, target: operation.parent || operation.target, createdNode: { uuid } };
             }
-            case 'setAssetRef':
-            case 'setEventBindings':
-            case 'setPrefabInstanceOverride':
-                report.summary.updatedProps += Object.keys(operation.props || operation.overrides || {}).length || 1;
-                return { index, op: operation.op, success: false, target: operation.target, errors: [{ code: 'OPERATION_NOT_IMPLEMENTED', path: `$.operations[${index}].op`, message: `${operation.op} requires additional Cocos Editor-specific implementation.`, suggestion: 'Use setComponentProps for simple properties in v0.1, or complete the dedicated operation adapter.' }] };
-            case 'moveNode':
-                return { index, op: operation.op, success: false, target: operation.target, errors: [{ code: 'OPERATION_NOT_IMPLEMENTED', path: `$.operations[${index}].op`, message: 'moveNode is validated but not yet wired to a stable Cocos Editor move API.' }] };
+            case 'setAssetRef': {
+                const uuid = await resolveNodeUuid(root, operation.target!);
+                if (!operation.componentType) throw new Error('setAssetRef requires componentType.');
+                const props = operation.props && Object.keys(operation.props).length > 0
+                    ? operation.props
+                    : operation.asset ? { asset: { asset: operation.asset } } : {};
+                await setEditorComponentProps(uuid, operation.componentType, await resolveEditorProps(root, props, `$.operations[${index}].props`));
+                report.summary.updatedProps += Object.keys(props).length;
+                return { index, op: operation.op, success: true, target: operation.target };
+            }
+            case 'setEventBindings': {
+                const uuid = await resolveNodeUuid(root, operation.target!);
+                if (!operation.componentType) throw new Error('setEventBindings requires componentType.');
+                const eventProps = operation.props || { clickEvents: operation.eventBindings || [] };
+                await setEditorComponentProps(uuid, operation.componentType, await resolveEditorProps(root, eventProps, `$.operations[${index}].eventBindings`));
+                report.summary.updatedProps += Object.keys(eventProps).length;
+                return { index, op: operation.op, success: true, target: operation.target };
+            }
+            case 'setPrefabInstanceOverride': {
+                const instanceRoot = resolveNodeRef(root, operation.target!, `$.operations[${index}].target`);
+                const overrideNodeRef = operation.overrides?.target || operation.overrides?.node || operation.target;
+                const targetNode = overrideNodeRef === operation.target ? instanceRoot : resolveNodeRef(instanceRoot, overrideNodeRef, `$.operations[${index}].overrides.target`);
+                const targetUuid = readNodeUuid(targetNode);
+                if (!targetUuid) throw new Error('Prefab instance override target node has no uuid.');
+                const nodeProps = operation.overrides?.nodeProps || (!operation.componentType ? (operation.props || operation.overrides?.props || {}) : {});
+                if (Object.keys(nodeProps).length > 0) {
+                    await setEditorNodeProps(targetUuid, await resolveEditorProps(root, nodeProps, `$.operations[${index}].overrides.nodeProps`));
+                    report.summary.updatedProps += Object.keys(nodeProps).length;
+                }
+                const componentType = operation.componentType || operation.overrides?.componentType;
+                const componentProps = operation.overrides?.componentProps || (componentType ? (operation.props || operation.overrides?.props || {}) : {});
+                if (componentType && Object.keys(componentProps).length > 0) {
+                    await setEditorComponentProps(targetUuid, componentType, await resolveEditorProps(root, componentProps, `$.operations[${index}].overrides.componentProps`));
+                    report.summary.updatedProps += Object.keys(componentProps).length;
+                }
+                return { index, op: operation.op, success: true, target: operation.target };
+            }
+            case 'moveNode': {
+                const uuid = await resolveNodeUuid(root, operation.target!);
+                const parentUuid = await resolveNodeUuid(root, operation.newParent || operation.parent!);
+                await moveEditorNode(uuid, parentUuid);
+                report.summary.movedNodes += 1;
+                return { index, op: operation.op, success: true, target: operation.target };
+            }
             default:
                 return { index, op: operation.op, success: false, errors: [{ code: 'UNKNOWN_PATCH_OPERATION', path: `$.operations[${index}].op`, message: `Unsupported operation ${operation.op}.` }] };
         }
