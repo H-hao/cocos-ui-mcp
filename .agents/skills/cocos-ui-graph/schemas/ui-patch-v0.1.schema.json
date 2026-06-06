@@ -1,0 +1,315 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "target",
+    "operations"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "ui-patch/v0.1"
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "prefab",
+            "scene",
+            "node"
+          ]
+        },
+        "path": {
+          "type": "string"
+        },
+        "uuid": {
+          "type": "string"
+        },
+        "current": {
+          "type": "boolean"
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "op"
+        ],
+        "properties": {
+          "op": {
+            "type": "string",
+            "enum": [
+              "addNode",
+              "removeNode",
+              "moveNode",
+              "setNodeProps",
+              "addComponent",
+              "removeComponent",
+              "setComponentProps",
+              "setAssetRef",
+              "setEventBindings",
+              "instantiatePrefab",
+              "setPrefabInstanceOverride"
+            ]
+          },
+          "parent": {
+            "type": "object",
+            "additionalProperties": false,
+            "anyOf": [
+              {
+                "required": [
+                  "uuid"
+                ]
+              },
+              {
+                "required": [
+                  "path"
+                ]
+              },
+              {
+                "required": [
+                  "name"
+                ]
+              }
+            ],
+            "properties": {
+              "uuid": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            }
+          },
+          "target": {
+            "type": "object",
+            "description": "Recursive UI Graph node."
+          },
+          "newParent": {
+            "type": "object",
+            "description": "Recursive UI Graph node."
+          },
+          "node": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "uuid": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              },
+              "active": {
+                "type": "boolean"
+              },
+              "factory": {
+                "type": "string",
+                "enum": [
+                  "Node",
+                  "Sprite",
+                  "Label",
+                  "Button",
+                  "Toggle",
+                  "Slider",
+                  "ScrollView",
+                  "PageView",
+                  "PageViewIndicator",
+                  "ProgressBar"
+                ]
+              },
+              "position": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "x": {
+                    "type": "number"
+                  },
+                  "y": {
+                    "type": "number"
+                  },
+                  "z": {
+                    "type": "number"
+                  }
+                }
+              },
+              "scale": {
+                "type": "object",
+                "description": "Recursive UI Graph node."
+              },
+              "rotation": {
+                "type": "object",
+                "description": "Recursive UI Graph node."
+              },
+              "size": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "width": {
+                    "type": "number"
+                  },
+                  "height": {
+                    "type": "number"
+                  }
+                }
+              },
+              "components": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "type"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "props": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              },
+              "children": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "description": "Recursive UI Graph node."
+                }
+              },
+              "prefab": {
+                "type": "object",
+                "additionalProperties": false,
+                "anyOf": [
+                  {
+                    "required": [
+                      "path"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "uuid"
+                    ]
+                  }
+                ],
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  },
+                  "uuid": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "SpriteFrame",
+                      "Prefab",
+                      "Material",
+                      "Script"
+                    ]
+                  }
+                }
+              },
+              "prefabOverrides": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "dynamicContent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "containerRole": {
+                    "type": "string"
+                  },
+                  "dataSource": {
+                    "type": "string"
+                  },
+                  "itemPrefab": {
+                    "type": "object",
+                    "description": "Recursive UI Graph node."
+                  },
+                  "bindingScript": {
+                    "type": "object",
+                    "description": "Recursive UI Graph node."
+                  },
+                  "editorPreview": true
+                }
+              }
+            }
+          },
+          "component": {
+            "type": "object",
+            "description": "Recursive UI Graph node."
+          },
+          "componentType": {
+            "type": "string"
+          },
+          "props": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "asset": {
+            "type": "object",
+            "description": "Recursive UI Graph node."
+          },
+          "prefab": {
+            "type": "object",
+            "description": "Recursive UI Graph node."
+          },
+          "scene": {
+            "type": "object",
+            "description": "Recursive UI Graph node."
+          },
+          "ifMissing": {
+            "type": "string",
+            "enum": [
+              "error",
+              "ignore"
+            ]
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "eventBindings": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "overrides": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      }
+    }
+  }
+}

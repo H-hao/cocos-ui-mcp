@@ -1,0 +1,6 @@
+{
+  "scene": { "type": "scene", "current": true },
+  "prefab": { "path": "db://assets/ui/LabelExample.prefab", "type": "Prefab" },
+  "parent": { "path": "Canvas/PageLayer" },
+  "props": { "name": "LabelExample" }
+}

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "ui-patch/v0.1",
+  "target": { "type": "prefab", "path": "db://assets/ui/MainPanel.prefab" },
+  "operations": [
+    {
+      "op": "addNode",
+      "parent": { "path": "MainPanel" },
+      "node": {
+        "name": "TitleLabel",
+        "factory": "Node",
+        "components": [
+          { "type": "UITransform", "props": { "contentSize": { "width": 300, "height": 80 } } },
+          { "type": "Label", "props": { "string": "Title", "fontSize": 55 } }
+        ]
+      }
+    }
+  ]
+}

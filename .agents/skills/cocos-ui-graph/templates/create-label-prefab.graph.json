@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "ui-graph/v0.1",
+  "target": { "type": "prefab", "path": "db://assets/ui/LabelExample.prefab" },
+  "metadata": { "generator": "cocos-ui-graph-skill", "managedBy": "ui-graph" },
+  "root": {
+    "name": "LabelExample",
+    "factory": "Node",
+    "children": [
+      {
+        "name": "TitleLabel",
+        "factory": "Node",
+        "components": [
+          { "type": "UITransform", "props": { "contentSize": { "width": 300, "height": 80 } } },
+          { "type": "Label", "props": { "string": "Title", "fontSize": 55 } }
+        ]
+      }
+    ]
+  }
+}

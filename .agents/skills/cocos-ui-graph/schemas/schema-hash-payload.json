@@ -1,0 +1,141 @@
+{
+  "graph": "ui-graph/v0.1",
+  "patch": "ui-patch/v0.1",
+  "skill": "cocos-ui-graph-skill/v0.1",
+  "factories": [
+    "Node",
+    "Sprite",
+    "Label",
+    "Button",
+    "Toggle",
+    "Slider",
+    "ScrollView",
+    "PageView",
+    "PageViewIndicator",
+    "ProgressBar"
+  ],
+  "operations": [
+    "addNode",
+    "removeNode",
+    "moveNode",
+    "setNodeProps",
+    "addComponent",
+    "removeComponent",
+    "setComponentProps",
+    "setAssetRef",
+    "setEventBindings",
+    "instantiatePrefab",
+    "setPrefabInstanceOverride"
+  ],
+  "components": {
+    "Node": [
+      "active",
+      "name",
+      "position",
+      "scale",
+      "rotation"
+    ],
+    "UITransform": [
+      "contentSize",
+      "anchorPoint",
+      "width",
+      "height"
+    ],
+    "Sprite": [
+      "spriteFrame",
+      "color",
+      "material",
+      "type",
+      "fillType",
+      "fillRange",
+      "fillStart"
+    ],
+    "Label": [
+      "string",
+      "fontSize",
+      "color",
+      "font",
+      "horizontalAlign",
+      "verticalAlign",
+      "lineHeight",
+      "overflow",
+      "enableWrapText"
+    ],
+    "Button": [
+      "interactable",
+      "transition",
+      "normalColor",
+      "pressedColor",
+      "hoverColor",
+      "disabledColor",
+      "clickEvents"
+    ],
+    "Widget": [
+      "isAlignTop",
+      "isAlignBottom",
+      "isAlignLeft",
+      "isAlignRight",
+      "isAlignHorizontalCenter",
+      "isAlignVerticalCenter",
+      "top",
+      "bottom",
+      "left",
+      "right",
+      "horizontalCenter",
+      "verticalCenter"
+    ],
+    "Layout": [
+      "type",
+      "resizeMode",
+      "paddingLeft",
+      "paddingRight",
+      "paddingTop",
+      "paddingBottom",
+      "spacingX",
+      "spacingY",
+      "horizontalDirection",
+      "verticalDirection"
+    ],
+    "Toggle": [
+      "isChecked",
+      "checkMark",
+      "toggleGroup"
+    ],
+    "ToggleGroup": [
+      "allowSwitchOff"
+    ],
+    "Slider": [
+      "progress",
+      "handle",
+      "direction"
+    ],
+    "ProgressBar": [
+      "progress",
+      "barSprite",
+      "mode",
+      "totalLength"
+    ],
+    "ScrollView": [
+      "content",
+      "horizontal",
+      "vertical",
+      "scrollEvents"
+    ],
+    "PageView": [
+      "content",
+      "direction",
+      "sizeMode",
+      "indicator"
+    ],
+    "PageViewIndicator": [
+      "spriteFrame",
+      "direction",
+      "cellSize",
+      "spacing"
+    ],
+    "Mask": [
+      "type",
+      "inverted"
+    ]
+  }
+}

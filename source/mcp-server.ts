@@ -15,6 +15,7 @@ import { SceneViewTools } from './tools/scene-view-tools';
 import { ReferenceImageTools } from './tools/reference-image-tools';
 import { AssetAdvancedTools } from './tools/asset-advanced-tools';
 import { ValidationTools } from './tools/validation-tools';
+import { UiGraphTools } from './tools/ui-graph-tools';
 
 export class MCPServer {
     private settings: MCPServerSettings;
@@ -33,6 +34,7 @@ export class MCPServer {
     private initializeTools(): void {
         try {
             console.log('[MCPServer] Initializing tools...');
+            this.tools.uiGraph = new UiGraphTools();
             this.tools.scene = new SceneTools();
             this.tools.node = new NodeTools();
             this.tools.component = new ComponentTools();
@@ -90,10 +92,10 @@ export class MCPServer {
     private setupTools(): void {
         this.toolsList = [];
         
-        // 如果没有启用工具配置，返回所有工具
+        // 如果没有启用工具配置，默认只暴露 UI Graph 高层工具
         if (!this.enabledTools || this.enabledTools.length === 0) {
             for (const [category, toolSet] of Object.entries(this.tools)) {
-                if (category === 'sceneAdvanced') {
+                if (category !== 'uiGraph') {
                     continue;
                 }
                 const tools = toolSet.getTools();

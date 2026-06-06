@@ -27,9 +27,20 @@ export interface ServerStatus {
     settings?: RawServerSettings;
 }
 
+export interface UiGraphProtocolState {
+    graphSchemaVersion: string;
+    patchSchemaVersion: string;
+    schemaHash: string;
+    supportedSkillVersion: string;
+    pluginVersion: string;
+    skillVersionMatched?: boolean;
+    warnings?: Array<{ code: string; message: string }>;
+}
+
 export interface ToolManagerState {
     success: boolean;
     availableTools?: ToolConfig[];
+    uiGraphProtocol?: UiGraphProtocolState;
 }
 
 export interface ToolStatusUpdate {

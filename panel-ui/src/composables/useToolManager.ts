@@ -6,13 +6,14 @@ import {
     updateToolStatusBatch,
 } from '../services/editor-api';
 import { notifyError, notifySuccess } from '../services/notify';
-import type { ToolConfig, ToolStatusUpdate } from '../types/contracts';
+import type { ToolConfig, ToolStatusUpdate, UiGraphProtocolState } from '../types/contracts';
 
 function cloneTools(tools: ToolConfig[]): ToolConfig[] {
     return tools.map((tool) => ({ ...tool }));
 }
 
 const CATEGORY_NAME_MAP: Record<string, string> = {
+    uiGraph: 'UI Graph 生产线',
     scene: '场景工具',
     node: '节点工具',
     component: '组件工具',
@@ -33,6 +34,7 @@ export function useToolManager() {
     const isSaving = ref(false);
     const isSavingLoading = ref(false);
     const lastCommittedTools = ref<ToolConfig[]>([]);
+    const uiGraphProtocol = ref<UiGraphProtocolState | null>(null);
     let loadingDelayTimer: ReturnType<typeof setTimeout> | null = null;
     let loadingVisibleSince = 0;
 
@@ -136,6 +138,7 @@ export function useToolManager() {
 
             availableTools.value = cloneTools(result.availableTools);
             lastCommittedTools.value = cloneTools(result.availableTools);
+            uiGraphProtocol.value = result.uiGraphProtocol || null;
         } catch (error) {
             notifyError(`加载工具列表失败：${toErrorMessage(error)}`);
         }
@@ -205,6 +208,7 @@ export function useToolManager() {
         totalTools,
         enabledTools,
         disabledTools,
+        uiGraphProtocol,
         getCategoryDisplayName,
         getToolsByCategory,
         loadToolManagerState,
